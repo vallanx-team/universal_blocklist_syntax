@@ -214,6 +214,7 @@ CLAUDE.md
 # EIGENE
 _secure/
 _dev/
+docs/
 config.json
 /temp/*
 /documents/*
