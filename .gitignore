@@ -222,4 +222,5 @@ composer.json
 composer.lock
 
 *.md
-!Readme.md
+!README.md
+!CHANGELOG.md

@@ -150,12 +150,147 @@ class UBSAPIHandler(BaseHTTPRequestHandler):
             self._send_response(200, response_data)
         
         except Exception as e:
+            self._send_error(500, f"Parse error: {str(e)}")
+    
+    def _handle_convert(self, data: Dict):
+        """Convert to format - POST /convert"""
+        from ubs_parser import UBSParser, UBSConverter
+        
+        content = data.get('content')
+        cache_key = data.get('cache_key')
+        target_format = data.get('format', 'hosts')
+        
+        # Get parser from cache or parse content
+        if cache_key and cache_key in self.parsers_cache:
+            parser = self.parsers_cache[cache_key]
+        elif content:
+            parser = UBSParser()
+            parser.parse(content)
+        else:
+            self._send_error(400, "Missing 'content' or 'cache_key'")
+            return
+        
+        try:
+            # Try to import TTL extension
+            try:
+                from ubs_ttl_extension import UBSConverterTTL
+                converter = UBSConverterTTL(parser)
+            except ImportError:
+                converter = UBSConverter(parser)
+            
+            # Map format names to converter methods
+            format_methods = {
+                'hosts': converter.to_hosts,
+                'adblock': converter.to_adblock,
+                'dnsmasq': converter.to_dnsmasq,
+                'unbound': converter.to_unbound,
+                'bind': converter.to_bind,
+                'squid': converter.to_squid,
+                'pac': converter.to_proxy_pac,
+                'suricata': converter.to_suricata,
+                'littlesnitch': converter.to_little_snitch,
+            }
+            
+            # Add TTL methods if available
+            if hasattr(converter, 'to_unbound_ttl'):
+                format_methods.update({
+                    'unbound_ttl': converter.to_unbound_ttl,
+                    'bind_ttl': converter.to_bind_ttl,
+                    'dnsmasq_ttl': converter.to_dnsmasq_ttl,
+                    'pihole_ttl': converter.to_pihole_ttl,
+                    'coredns_ttl': converter.to_coredns_ttl,
+                })
+            
+            if target_format not in format_methods:
+                self._send_error(400, f"Unknown format: {target_format}. Available: {list(format_methods.keys())}")
+                return
+            
+            # Convert
+            result = format_methods[target_format]()
+            
+            self._send_response(200, {
+                'format': target_format,
+                'content': result,
+                'rules_count': len(parser.rules)
+            })
+        
+        except Exception as e:
+            self._send_error(500, f"Conversion error: {str(e)}")
+    
+    def _handle_validate(self, data: Dict):
+        """Validate UBS content - POST /validate"""
+        from ubs_parser import UBSParser
+        
+        content = data.get('content')
+        
+        if not content:
+            self._send_error(400, "Missing 'content' field")
+            return
+        
+        try:
+            parser = UBSParser()
+            parser.parse(content)
+            
+            # Try to import advanced features for validation
+            try:
+                from ubs_advanced_features import RuleValidator
+                
+                strict = data.get('strict', False)
+                check_dns = data.get('check_dns', False)
+                
+                validator = RuleValidator(strict_mode=strict, check_dns=check_dns)
+                issues = validator.validate(parser)
+                
+                response_data = {
+                    'valid': len([i for i in issues if i.severity == 'error']) == 0,
+                    'issues': [
+                        {
+                            'severity': issue.severity,
+                            'line': issue.line,
+                            'message': issue.message,
+                            'suggestion': issue.suggestion
+                        }
+                        for issue in issues
+                    ],
+                    'stats': {
+                        'errors': len([i for i in issues if i.severity == 'error']),
+                        'warnings': len([i for i in issues if i.severity == 'warning']),
+                        'info': len([i for i in issues if i.severity == 'info'])
+                    }
+                }
+                
+                if check_dns:
+                    dns_summary = validator.get_dns_check_summary()
+                    response_data['dns_check'] = dns_summary
+            
+            except ImportError:
+                # Fallback: Basic validation using parser errors
+                response_data = {
+                    'valid': len(parser.errors) == 0,
+                    'issues': [
+                        {
+                            'severity': 'error',
+                            'line': 0,
+                            'message': error,
+                            'suggestion': None
+                        }
+                        for error in parser.errors
+                    ],
+                    'stats': {
+                        'errors': len(parser.errors),
+                        'warnings': 0,
+                        'info': 0
+                    }
+                }
+            
+            self._send_response(200, response_data)
+        
+        except Exception as e:
             self._send_error(500, f"Validation error: {str(e)}")
     
     def _handle_lookup(self, domain: str):
         """Lookup if domain is blocked - GET /lookup?domain=example.com"""
-        from ubs_parser import UBSParser
-        from ubs_advanced_features import URLTester
+        from ubs_parser import UBSParser, RuleType
         
         # In production, would have a persistent parser
         # For demo, return error if no parser cached
@@ -167,17 +302,40 @@ class UBSAPIHandler(BaseHTTPRequestHandler):
         parser = list(self.parsers_cache.values())[-1]
         
         try:
-            tester = URLTester(parser)
-            result = tester.test_url(f"https://{domain}/")
+            # Try to import advanced features
+            try:
+                from ubs_advanced_features import URLTester
+                tester = URLTester(parser)
+                result = tester.test_url(f"https://{domain}/")
+                
+                response_data = {
+                    'domain': domain,
+                    'blocked': result.blocked,
+                    'action': result.action,
+                    'reason': result.reason,
+                    'matching_rules': result.matching_rules,
+                    'performance_ms': result.performance_ms
+                }
             
-            response_data = {
-                'domain': domain,
-                'blocked': result.blocked,
-                'action': result.action,
-                'reason': result.reason,
-                'matching_rules': result.matching_rules,
-                'performance_ms': result.performance_ms
-            }
+            except ImportError:
+                # Fallback: Basic lookup
+                blocked = False
+                matching_rules = []
+                
+                for rule in parser.rules:
+                    if rule.rule_type == RuleType.DOMAIN:
+                        if domain == rule.pattern or domain.endswith('.' + rule.pattern):
+                            blocked = True
+                            matching_rules.append(rule.pattern)
+                
+                response_data = {
+                    'domain': domain,
+                    'blocked': blocked,
+                    'action': 'block' if blocked else 'allow',
+                    'reason': 'Domain match' if blocked else 'No match',
+                    'matching_rules': matching_rules,
+                    'performance_ms': 0
+                }
             
             self._send_response(200, response_data)
         
@@ -698,93 +856,3 @@ if __name__ == "__main__":
     print("   (Demo mode - not fetching)\n")
     
     print("✅ All API & Integration modules loaded successfully!")
-500, f"Parse error: {str(e)}")
-    
-    def _handle_convert(self, data: Dict):
-        """Convert to format - POST /convert"""
-        from ubs_parser import UBSParser, UBSConverter
-        from ubs_smart_converter import SmartConverter, TargetFormat
-        
-        content = data.get('content')
-        cache_key = data.get('cache_key')
-        target_format = data.get('format', 'hosts')
-        optimize = data.get('optimize', True)
-        
-        # Get parser from cache or parse content
-        if cache_key and cache_key in self.parsers_cache:
-            parser = self.parsers_cache[cache_key]
-        elif content:
-            parser = UBSParser()
-            parser.parse(content)
-        else:
-            self._send_error(400, "Missing 'content' or 'cache_key'")
-            return
-        
-        try:
-            converter = SmartConverter(parser)
-            
-            # Try to convert
-            try:
-                format_enum = TargetFormat(target_format)
-                result = converter.convert(format_enum, optimize=optimize)
-            except ValueError:
-                result = converter.convert_auto(target_format, optimize=optimize)
-            
-            if result.success:
-                self._send_response(200, {
-                    'format': result.format,
-                    'content': result.content,
-                    'optimizations': result.optimizations_applied
-                })
-            else:
-                self._send_error(500, f"Conversion failed: {result.error}")
-        
-        except Exception as e:
-            self._send_error(500, f"Conversion error: {str(e)}")
-    
-    def _handle_validate(self, data: Dict):
-        """Validate UBS content - POST /validate"""
-        from ubs_parser import UBSParser
-        from ubs_advanced_features import RuleValidator
-        
-        content = data.get('content')
-        strict = data.get('strict', False)
-        check_dns = data.get('check_dns', False)
-        
-        if not content:
-            self._send_error(400, "Missing 'content' field")
-            return
-        
-        try:
-            parser = UBSParser()
-            parser.parse(content)
-            
-            validator = RuleValidator(strict_mode=strict, check_dns=check_dns)
-            issues = validator.validate(parser)
-            
-            response_data = {
-                'valid': len([i for i in issues if i.severity == 'error']) == 0,
-                'issues': [
-                    {
-                        'severity': issue.severity,
-                        'line': issue.line,
-                        'message': issue.message,
-                        'suggestion': issue.suggestion
-                    }
-                    for issue in issues
-                ],
-                'stats': {
-                    'errors': len([i for i in issues if i.severity == 'error']),
-                    'warnings': len([i for i in issues if i.severity == 'warning']),
-                    'info': len([i for i in issues if i.severity == 'info'])
-                }
-            }
-            
-            if check_dns:
-                dns_summary = validator.get_dns_check_summary()
-                response_data['dns_check'] = dns_summary
-            
-            self._send_response(200, response_data)
-        
-        except Exception as e:
-            self._send_error(

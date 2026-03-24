@@ -1,616 +1,794 @@
 #!/usr/bin/env python3
 """
-Universal Blocklist Syntax (UBS) Parser and Converter
-Version: 1.0.0
+Universal Blocklist Syntax (UBS) Parser
+Version 3.0 with Flexible Modifier Support
+
+Supports both modifier syntaxes:
+- AdBlock-Style: $third-party,script
+- UBS-Native: :severity=high :category=malware
+- Mixed: $third-party :severity=high
+
+Author: Valanx UBS Team
+License: MIT
 """
 
 import re
-import json
-from typing import List, Dict, Optional, Set, Union
-from dataclasses import dataclass, field
 from enum import Enum
+from typing import Dict, List, Tuple, Optional, Set
+from dataclasses import dataclass, field
 from datetime import datetime
 
 
+# ============================================================================
+# ENUMS & DATA CLASSES
+# ============================================================================
+
 class RuleType(Enum):
-    """Types of blocklist rules"""
+    """Type of blocking rule"""
     DOMAIN = "domain"
-    URL_PATTERN = "url_pattern"
-    ELEMENT_HIDING = "element_hiding"
-    SCRIPTLET = "scriptlet"
-    SURICATA = "suricata"
-    PROXY = "proxy"
-    WHITELIST = "whitelist"
-    HEADER_MODIFY = "header_modify"
+    URL = "url"
+    REGEX = "regex"
+    CSS_SELECTOR = "css_selector"
+    HTML_FILTER = "html_filter"
+    WAF_RULE = "waf_rule"
+    SURICATA_RULE = "suricata_rule"
+    EXCEPTION = "exception"
+    COMMENT = "comment"
 
 
 class Action(Enum):
-    """Available actions for rules"""
+    """Action to take for a rule"""
     BLOCK = "block"
     ALLOW = "allow"
-    REDIRECT = "redirect"
-    NULL = "null"
-    NXDOMAIN = "nxdomain"
     DROP = "drop"
-    ALERT = "alert"
     LOG = "log"
+    REDIRECT = "redirect"
+
+
+class Severity(Enum):
+    """Severity level for threats"""
+    CRITICAL = "critical"
+    HIGH = "high"
+    MEDIUM = "medium"
+    LOW = "low"
+    INFO = "info"
+
+
+class ModifierCategory(Enum):
+    """Categories of modifiers for syntax handling"""
+    ADBLOCK = "adblock"      # AdBlock-Style (uses $)
+    UBS_NATIVE = "ubs"       # UBS-specific (uses :)
+    SURICATA = "suricata"    # Suricata-specific
+    COMMON = "common"        # Can use both
 
 
 @dataclass
-class Metadata:
-    """List metadata from directives"""
-    title: Optional[str] = None
-    version: Optional[str] = None
-    updated: Optional[str] = None
-    expires: Optional[str] = None
-    homepage: Optional[str] = None
-    license: Optional[str] = None
-    includes: List[str] = field(default_factory=list)
-    targets: Set[str] = field(default_factory=set)
+class ParsedModifier:
+    """A parsed modifier with metadata"""
+    name: str                    # Normalized name
+    value: Optional[str]         # Value (if any)
+    original_name: str           # Original name from file
+    original_prefix: str         # Original prefix ($ or :)
+    category: ModifierCategory   # Category of modifier
+    line_position: int = 0       # Position in line
 
 
 @dataclass
 class Rule:
-    """Parsed blocklist rule"""
-    raw_line: str
+    """A single UBS rule"""
     rule_type: RuleType
     pattern: str
-    modifiers: Dict[str, Union[str, List[str], bool]] = field(default_factory=dict)
-    section: Optional[str] = None
+    action: Action = Action.BLOCK
+    modifiers: Dict[str, Optional[str]] = field(default_factory=dict)
+    severity: Optional[Severity] = None
+    category: Optional[str] = None
+    comment: Optional[str] = None
     line_number: int = 0
-    
-    def to_dict(self) -> Dict:
-        """Convert rule to dictionary"""
-        return {
-            'type': self.rule_type.value,
-            'pattern': self.pattern,
-            'modifiers': self.modifiers,
-            'section': self.section,
-            'line': self.line_number
-        }
+    raw_line: str = ""
 
+
+@dataclass
+class Metadata:
+    """Metadata about the blocklist"""
+    title: Optional[str] = None
+    version: Optional[str] = None
+    description: Optional[str] = None
+    homepage: Optional[str] = None
+    expires: Optional[str] = None
+    last_modified: Optional[datetime] = None
+    author: Optional[str] = None
+    license: Optional[str] = None
+
+
+# ============================================================================
+# MODIFIER DEFINITIONS
+# ============================================================================
+
+# Modifier Categories
+MODIFIER_CATEGORIES = {
+    # AdBlock-Style Modifiers (prefer $)
+    'third-party': ModifierCategory.ADBLOCK,
+    'first-party': ModifierCategory.ADBLOCK,
+    'script': ModifierCategory.ADBLOCK,
+    'image': ModifierCategory.ADBLOCK,
+    'stylesheet': ModifierCategory.ADBLOCK,
+    'font': ModifierCategory.ADBLOCK,
+    'media': ModifierCategory.ADBLOCK,
+    'object': ModifierCategory.ADBLOCK,
+    'xmlhttprequest': ModifierCategory.ADBLOCK,
+    'websocket': ModifierCategory.ADBLOCK,
+    'subdocument': ModifierCategory.ADBLOCK,
+    'ping': ModifierCategory.ADBLOCK,
+    'popup': ModifierCategory.ADBLOCK,
+    'popunder': ModifierCategory.ADBLOCK,
+    'document': ModifierCategory.ADBLOCK,
+    'genericblock': ModifierCategory.ADBLOCK,
+    'generichide': ModifierCategory.ADBLOCK,
+    'specifichide': ModifierCategory.ADBLOCK,
+    'badfilter': ModifierCategory.ADBLOCK,
+    'csp': ModifierCategory.ADBLOCK,
+    'redirect': ModifierCategory.ADBLOCK,
+    'redirect-rule': ModifierCategory.ADBLOCK,
+    'remove-header': ModifierCategory.ADBLOCK,
+    'webrtc': ModifierCategory.ADBLOCK,
+    'empty': ModifierCategory.ADBLOCK,
+    'mp4': ModifierCategory.ADBLOCK,
+    'inline-script': ModifierCategory.ADBLOCK,
+    'inline-font': ModifierCategory.ADBLOCK,
+    
+    # UBS-Native Modifiers (prefer :)
+    'severity': ModifierCategory.UBS_NATIVE,
+    'category': ModifierCategory.UBS_NATIVE,
+    'msg': ModifierCategory.UBS_NATIVE,
+    'reason': ModifierCategory.UBS_NATIVE,
+    'expires': ModifierCategory.UBS_NATIVE,
+    'updated': ModifierCategory.UBS_NATIVE,
+    'ttl': ModifierCategory.UBS_NATIVE,
+    'rate-limit': ModifierCategory.UBS_NATIVE,
+    'burst': ModifierCategory.UBS_NATIVE,
+    'timeout': ModifierCategory.UBS_NATIVE,
+    'proxy': ModifierCategory.UBS_NATIVE,
+    'fallback': ModifierCategory.UBS_NATIVE,
+    'weight': ModifierCategory.UBS_NATIVE,
+    'priority': ModifierCategory.UBS_NATIVE,
+    
+    # Suricata-Specific
+    'classtype': ModifierCategory.SURICATA,
+    'sid': ModifierCategory.SURICATA,
+    'rev': ModifierCategory.SURICATA,
+    'content': ModifierCategory.SURICATA,
+    
+    # Common (both syntaxes allowed)
+    'action': ModifierCategory.COMMON,
+    'block': ModifierCategory.COMMON,
+    'allow': ModifierCategory.COMMON,
+    'log': ModifierCategory.COMMON,
+    'domain': ModifierCategory.COMMON,
+    'host': ModifierCategory.COMMON,
+    'path': ModifierCategory.COMMON,
+    'protocol': ModifierCategory.COMMON,
+    'port': ModifierCategory.COMMON,
+    'query': ModifierCategory.COMMON,
+    'important': ModifierCategory.COMMON,
+    'selector': ModifierCategory.COMMON,
+    'other': ModifierCategory.COMMON,
+    'all': ModifierCategory.COMMON,
+}
+
+# Valid modifiers set (for validation)
+VALID_MODIFIERS = set(MODIFIER_CATEGORIES.keys())
+
+# Modifier Aliases (shorthand forms)
+MODIFIER_ALIASES = {
+    'third': 'third-party',
+    'first': 'first-party',
+    '3p': 'third-party',
+    '1p': 'first-party',
+    '3rd': 'third-party',
+    '1st': 'first-party',
+    'thirdparty': 'third-party',
+    'firstparty': 'first-party',
+    'xhr': 'xmlhttprequest',
+    'ws': 'websocket',
+    'css': 'stylesheet',
+    'img': 'image',
+    'doc': 'document',
+    'subdoc': 'subdocument',
+    'frame': 'subdocument',
+    'deny': 'block',
+    'permit': 'allow',
+    'drop': 'block',
+    'popup-window': 'popup',
+    'pop-up': 'popup',
+}
+
+
+# ============================================================================
+# FLEXIBLE MODIFIER PARSER
+# ============================================================================
+
+class FlexibleModifierParser:
+    """
+    Parser that accepts both modifier syntaxes:
+    - AdBlock-Style: $third-party,script
+    - UBS-Native: :severity=high :category=malware
+    - Mixed: $third-party :severity=high
+    """
+    
+    def __init__(self, strict_syntax: bool = False):
+        """
+        Args:
+            strict_syntax: If True, warns when wrong prefix is used for modifier category
+        """
+        self.strict_syntax = strict_syntax
+        self.warnings: List[str] = []
+        self.errors: List[str] = []
+    
+    def parse(self, rule_string: str) -> Tuple[str, List[ParsedModifier]]:
+        """
+        Parse a rule and extract modifiers
+        
+        Args:
+            rule_string: Complete rule line
+            
+        Returns:
+            (base_rule, modifiers): Base rule without modifiers and list of ParsedModifier
+        """
+        self.warnings.clear()
+        self.errors.clear()
+        
+        # Find all modifiers (start with $ or :)
+        modifiers: List[ParsedModifier] = []
+        
+        # Find base rule (everything before first modifier)
+        match = re.search(r'([\$:])', rule_string)
+        if match:
+            base_rule = rule_string[:match.start()].strip()
+            modifier_string = rule_string[match.start():]
+        else:
+            # No modifiers found
+            return rule_string.strip(), []
+        
+        # Parse modifier string
+        modifiers = self._parse_modifier_string(modifier_string)
+        
+        return base_rule, modifiers
+    
+    def _parse_modifier_string(self, modifier_string: str) -> List[ParsedModifier]:
+        """Parse a modifier string with mixed prefixes"""
+        modifiers = []
+        
+        # Pattern: ($ or :) followed by modifier-name (optional =value)
+        # Supports: $name, :name, $name=value, :name=value, :name="value"
+        # pattern = r'([\$:])([a-z0-9_-]+)(?:=([^\s\$:,]+|"[^"]*"))?'
+        # Supports: $name, :name, $name=value, :name=value, :name="value" :name"val:value" :name="val val mod" :name="val, mod"
+        pattern = r'([\$:])([a-z0-9_-]+)(?:=("[^"]*"|[^,\s\$:]+))?'
+        
+        for match in re.finditer(pattern, modifier_string, re.IGNORECASE):
+            prefix = match.group(1)        # $ or :
+            name = match.group(2).lower()  # modifier name
+            value = match.group(3)         # optional value
+            
+            # Remove quotes from value if present
+            if value and value.startswith('"') and value.endswith('"'):
+                value = value[1:-1]
+            
+            # Normalize name (resolve aliases)
+            original_name = name
+            name = self._normalize_modifier_name(name)
+            
+            # Get category
+            category = MODIFIER_CATEGORIES.get(name, ModifierCategory.COMMON)
+            
+            # Syntax validation (optional warning)
+            if self.strict_syntax:
+                expected_prefix = self._get_expected_prefix(category)
+                if prefix != expected_prefix:
+                    self.warnings.append(
+                        f"Modifier '{original_name}' uses '{prefix}' but '{expected_prefix}' "
+                        f"is recommended for {category.value} modifiers"
+                    )
+            
+            # Check if modifier is valid
+            if name not in VALID_MODIFIERS:
+                self.errors.append(f"Unknown modifier: {original_name}")
+            
+            # Create parsed modifier
+            parsed = ParsedModifier(
+                name=name,
+                value=value,
+                original_name=original_name,
+                original_prefix=prefix,
+                category=category,
+                line_position=match.start()
+            )
+            
+            modifiers.append(parsed)
+        
+        return modifiers
+    
+    def _normalize_modifier_name(self, name: str) -> str:
+        """Resolve aliases and normalize modifier name"""
+        name = name.strip().lower()
+        return MODIFIER_ALIASES.get(name, name)
+    
+    def _get_expected_prefix(self, category: ModifierCategory) -> str:
+        """Get expected prefix for a modifier category"""
+        if category == ModifierCategory.ADBLOCK:
+            return '$'
+        elif category in (ModifierCategory.UBS_NATIVE, ModifierCategory.SURICATA):
+            return ':'
+        else:  # COMMON
+            return '$'  # Default to $
+
+
+# ============================================================================
+# MAIN UBS PARSER
+# ============================================================================
 
 class UBSParser:
-    """Parser for Universal Blocklist Syntax"""
+    """
+    Main parser for Universal Blocklist Syntax files
+    Supports flexible modifier syntax (both $ and :)
+    """
     
-    def __init__(self):
-        self.metadata = Metadata()
+    def __init__(self, strict_syntax: bool = False):
+        """
+        Initialize parser
+        
+        Args:
+            strict_syntax: If True, generates warnings for inconsistent syntax
+        """
         self.rules: List[Rule] = []
-        self.current_section: Optional[str] = None
+        self.metadata = Metadata()
         self.errors: List[str] = []
+        self.warnings: List[str] = []
+        self.current_section: Optional[str] = None
         
-        # Regex patterns
-        self.directive_pattern = re.compile(r'^!\s*(\w+):\s*(.+)$')
-        self.section_pattern = re.compile(r'^\[(.+)\]$')
-        self.modifier_pattern = re.compile(r':(\w+)(?:=([^:\s]+))?')
-        self.domain_pattern = re.compile(r'^[\w\*\.\-]+$')
-        self.regex_pattern = re.compile(r'^~(.+)$')
-        self.url_pattern = re.compile(r'^\|\|(.+?)[\^\/]?')
-        self.element_hiding_pattern = re.compile(r'^(.+?)##(.+)$')
-        self.scriptlet_pattern = re.compile(r'^(.+?)#\+\+js\((.+)\)$')
-        self.suricata_pattern = re.compile(r'^>>(\w+)(?::(\d+))?\s+(.+)$')
-        self.proxy_pattern = re.compile(r'^(.+?)\s+:proxy=(.+)$')
+        # Flexible modifier parser
+        self.modifier_parser = FlexibleModifierParser(strict_syntax=strict_syntax)
+    
+    def parse(self, content: str) -> None:
+        """
+        Parse UBS file content
         
-    def parse(self, content: str) -> 'UBSParser':
-        """Parse UBS content"""
+        Args:
+            content: String content of UBS file
+        """
+        self.rules.clear()
+        self.errors.clear()
+        self.warnings.clear()
+        
         lines = content.split('\n')
         
-        for line_num, line in enumerate(lines, 1):
+        for line_number, line in enumerate(lines, 1):
             line = line.strip()
             
             # Skip empty lines
             if not line:
                 continue
-                
-            # Remove inline comments
-            if '#' in line and not line.startswith('#'):
-                line = line.split('#')[0].strip()
             
-            # Skip full-line comments
-            if line.startswith('#'):
-                continue
-                
+            # Parse line
             try:
-                self._parse_line(line, line_num)
+                self._parse_line(line, line_number)
             except Exception as e:
-                self.errors.append(f"Line {line_num}: {str(e)}")
-                
-        return self
+                self.errors.append(f"Line {line_number}: Parse error - {str(e)}")
     
-    def _parse_line(self, line: str, line_num: int):
+    def _parse_line(self, line: str, line_number: int) -> None:
         """Parse a single line"""
         
-        # Check for directive
+        # Metadata (starts with !)
         if line.startswith('!'):
-            self._parse_directive(line)
+            self._parse_metadata(line)
             return
-            
-        # Check for section
-        section_match = self.section_pattern.match(line)
-        if section_match:
-            self.current_section = section_match.group(1)
-            return
-            
-        # Parse rule
-        rule = self._parse_rule(line, line_num)
-        if rule:
-            rule.section = self.current_section
-            self.rules.append(rule)
-    
-    def _parse_directive(self, line: str):
-        """Parse metadata directive"""
-        match = self.directive_pattern.match(line)
-        if not match:
-            return
-            
-        key, value = match.groups()
-        key = key.lower().replace('-', '_')
         
-        if key == 'title':
-            self.metadata.title = value
-        elif key == 'version':
-            self.metadata.version = value
-        elif key == 'updated':
-            self.metadata.updated = value
-        elif key == 'expires':
-            self.metadata.expires = value
-        elif key == 'homepage':
-            self.metadata.homepage = value
-        elif key == 'license':
-            self.metadata.license = value
-        elif key == 'include':
-            self.metadata.includes.append(value)
-        elif key == 'target':
-            self.metadata.targets.update(v.strip() for v in value.split(','))
-    
-    def _parse_rule(self, line: str, line_num: int) -> Optional[Rule]:
-        """Parse a rule line"""
+        # Section header
+        if line.startswith('[') and line.endswith(']'):
+            self.current_section = line[1:-1]
+            return
         
-        # Extract modifiers
+        # Comment (starts with #)
+        if line.startswith('#'):
+            return
+        
+        # CSS Selector
+        if '##' in line or '#@#' in line:
+            self._parse_css_selector(line, line_number)
+            return
+        
+        # HTML Filter
+        if '#$#' in line or '#@$#' in line:
+            self._parse_html_filter(line, line_number)
+            return
+        
+        # WAF Rule (starts with >>)
+        if line.startswith('>>'):
+            self._parse_waf_rule(line, line_number)
+            return
+        
+        # Suricata Rule (starts with alert/drop/reject)
+        if line.startswith(('alert', 'drop', 'reject', 'pass')):
+            self._parse_suricata_rule(line, line_number)
+            return
+        
+        # Exception rule (starts with @@)
+        if line.startswith('@@'):
+            self._parse_exception_rule(line[2:], line_number)
+            return
+        
+        # Regular domain/URL rule
+        self._parse_domain_rule(line, line_number)
+    
+    def _parse_metadata(self, line: str) -> None:
+        """Parse metadata line"""
+        line = line[1:].strip()  # Remove !
+        
+        if ':' not in line:
+            return
+        
+        key, value = line.split(':', 1)
+        key = key.strip().lower()
+        value = value.strip()
+        
+        metadata_map = {
+            'title': 'title',
+            'version': 'version',
+            'description': 'description',
+            'homepage': 'homepage',
+            'expires': 'expires',
+            'author': 'author',
+            'license': 'license',
+        }
+        
+        if key in metadata_map:
+            setattr(self.metadata, metadata_map[key], value)
+    
+    def _parse_domain_rule(self, line: str, line_number: int) -> None:
+        """Parse domain or URL rule with flexible modifiers"""
+        
+        # Use flexible modifier parser
+        base_rule, parsed_modifiers = self.modifier_parser.parse(line)
+        
+        # Convert to modifier dict
         modifiers = {}
-        pattern = line
+        for mod in parsed_modifiers:
+            modifiers[mod.name] = mod.value
         
-        if ':' in line:
-            parts = line.split(':')
-            pattern = parts[0].strip()
-            modifier_str = ':'.join(parts[1:])
-            modifiers = self._parse_modifiers(modifier_str)
+        # Add warnings from modifier parser
+        for warning in self.modifier_parser.warnings:
+            self.warnings.append(f"Line {line_number}: {warning}")
         
-        # Determine rule type and parse
+        # Add errors from modifier parser
+        for error in self.modifier_parser.errors:
+            self.errors.append(f"Line {line_number}: {error}")
         
-        # Whitelist (starts with @)
-        if pattern.startswith('@'):
-            pattern = pattern[1:]
-            rule_type = RuleType.WHITELIST
-            modifiers['action'] = 'allow'
-            
-            # Check if it's a URL pattern
-            if pattern.startswith('||'):
-                pattern = self._extract_url_pattern(pattern)
-                rule_type = RuleType.URL_PATTERN
+        # Determine rule type
+        rule_type = self._detect_rule_type(base_rule)
         
-        # Element hiding
-        elif '##' in pattern:
-            match = self.element_hiding_pattern.match(pattern)
-            if match:
-                domain, selector = match.groups()
-                return Rule(
-                    raw_line=line,
-                    rule_type=RuleType.ELEMENT_HIDING,
-                    pattern=pattern,
-                    modifiers={'domain': domain, 'selector': selector, **modifiers},
-                    line_number=line_num
-                )
+        # Extract action
+        action = Action.BLOCK
+        if 'action' in modifiers:
+            action_str = modifiers['action']
+            try:
+                action = Action(action_str.lower())
+            except ValueError:
+                self.warnings.append(f"Line {line_number}: Unknown action '{action_str}'")
+        elif 'allow' in modifiers:
+            action = Action.ALLOW
+        elif 'block' in modifiers:
+            action = Action.BLOCK
         
-        # Scriptlet injection
-        elif '#++js' in pattern:
-            match = self.scriptlet_pattern.match(pattern)
-            if match:
-                domain, scriptlet = match.groups()
-                return Rule(
-                    raw_line=line,
-                    rule_type=RuleType.SCRIPTLET,
-                    pattern=pattern,
-                    modifiers={'domain': domain, 'scriptlet': scriptlet, **modifiers},
-                    line_number=line_num
-                )
+        # Extract severity
+        severity = None
+        if 'severity' in modifiers:
+            try:
+                severity = Severity(modifiers['severity'].lower())
+            except (ValueError, AttributeError):
+                self.warnings.append(f"Line {line_number}: Invalid severity")
         
-        # Suricata-style rule
-        elif pattern.startswith('>>'):
-            match = self.suricata_pattern.match(pattern)
-            if match:
-                protocol, port, content = match.groups()
-                return Rule(
-                    raw_line=line,
-                    rule_type=RuleType.SURICATA,
-                    pattern=pattern,
-                    modifiers={
-                        'protocol': protocol,
-                        'port': port,
-                        'content': content,
-                        **modifiers
-                    },
-                    line_number=line_num
-                )
-        
-        # Proxy rule
-        elif 'proxy' in modifiers:
-            rule_type = RuleType.PROXY
-        
-        # URL pattern (AdBlock-style)
-        elif pattern.startswith('||'):
-            pattern = self._extract_url_pattern(pattern)
-            rule_type = RuleType.URL_PATTERN
-        
-        # Regex pattern
-        elif pattern.startswith('~'):
-            match = self.regex_pattern.match(pattern)
-            if match:
-                pattern = match.group(1)
-                rule_type = RuleType.DOMAIN
-                modifiers['regex'] = True
-        
-        # Simple domain
-        elif self.domain_pattern.match(pattern):
-            rule_type = RuleType.DOMAIN
-        
-        # Path pattern
-        elif '/' in pattern:
-            rule_type = RuleType.URL_PATTERN
-        
-        else:
-            # Unknown pattern, treat as domain
-            rule_type = RuleType.DOMAIN
-        
-        return Rule(
-            raw_line=line,
+        # Create rule
+        rule = Rule(
             rule_type=rule_type,
-            pattern=pattern,
+            pattern=base_rule,
+            action=action,
             modifiers=modifiers,
-            line_number=line_num
+            severity=severity,
+            category=modifiers.get('category'),
+            comment=modifiers.get('msg') or modifiers.get('reason'),
+            line_number=line_number,
+            raw_line=line
         )
+        
+        self.rules.append(rule)
     
-    def _parse_modifiers(self, modifier_str: str) -> Dict:
-        """Parse modifier string"""
-        modifiers = {}
+    def _parse_exception_rule(self, line: str, line_number: int) -> None:
+        """Parse exception rule (whitelist)"""
+        base_rule, parsed_modifiers = self.modifier_parser.parse(line)
         
-        for match in self.modifier_pattern.finditer(modifier_str):
-            key, value = match.groups()
-            
-            if value:
-                # Handle comma-separated values
-                if '|' in value:
-                    value = value.split('|')
-                elif ',' in value:
-                    value = value.split(',')
-                    
-            modifiers[key] = value if value else True
-            
-        return modifiers
+        modifiers = {mod.name: mod.value for mod in parsed_modifiers}
+        
+        rule = Rule(
+            rule_type=RuleType.EXCEPTION,
+            pattern=base_rule,
+            action=Action.ALLOW,
+            modifiers=modifiers,
+            comment=modifiers.get('reason'),
+            line_number=line_number,
+            raw_line=line
+        )
+        
+        self.rules.append(rule)
     
-    def _extract_url_pattern(self, pattern: str) -> str:
-        """Extract URL pattern from AdBlock-style syntax"""
-        # Remove || prefix
-        pattern = pattern.replace('||', '')
-        # Remove ^ suffix
-        pattern = pattern.rstrip('^')
-        return pattern
-    
-    def get_rules_by_type(self, rule_type: RuleType) -> List[Rule]:
-        """Get all rules of a specific type"""
-        return [rule for rule in self.rules if rule.rule_type == rule_type]
-    
-    def get_rules_by_section(self, section: str) -> List[Rule]:
-        """Get all rules in a specific section"""
-        return [rule for rule in self.rules if rule.section == section]
-    
-    def to_json(self) -> str:
-        """Export parsed data as JSON"""
-        return json.dumps({
-            'metadata': {
-                'title': self.metadata.title,
-                'version': self.metadata.version,
-                'updated': self.metadata.updated,
-                'expires': self.metadata.expires,
-                'homepage': self.metadata.homepage,
-                'license': self.metadata.license,
-                'includes': self.metadata.includes,
-                'targets': list(self.metadata.targets)
-            },
-            'rules': [rule.to_dict() for rule in self.rules],
-            'errors': self.errors
-        }, indent=2)
-
-
-class UBSConverter:
-    """Convert UBS rules to various formats"""
-    
-    def __init__(self, parser: UBSParser):
-        self.parser = parser
-    
-    def to_hosts(self, ip: str = "0.0.0.0") -> str:
-        """Convert to hosts file format"""
-        lines = ["# Converted from UBS format"]
-        lines.append(f"# Generated: {datetime.now().isoformat()}")
-        
-        if self.parser.metadata.title:
-            lines.append(f"# Title: {self.parser.metadata.title}")
-        
-        lines.append("")
-        
-        for rule in self.parser.rules:
-            # Only process domain-level blocks
-            if rule.rule_type == RuleType.DOMAIN and rule.modifiers.get('action') != 'allow':
-                pattern = rule.pattern.replace('*.', '')
-                if not rule.modifiers.get('regex'):
-                    lines.append(f"{ip} {pattern}")
-        
-        return '\n'.join(lines)
-    
-    def to_adblock(self) -> str:
-        """Convert to AdBlock Plus / uBlock Origin format"""
-        lines = ["[Adblock Plus 2.0]"]
-        
-        if self.parser.metadata.title:
-            lines.append(f"! Title: {self.parser.metadata.title}")
-        if self.parser.metadata.version:
-            lines.append(f"! Version: {self.parser.metadata.version}")
-        if self.parser.metadata.homepage:
-            lines.append(f"! Homepage: {self.parser.metadata.homepage}")
-        
-        lines.append("")
-        
-        for rule in self.parser.rules:
-            adblock_rule = self._convert_to_adblock_rule(rule)
-            if adblock_rule:
-                lines.append(adblock_rule)
-        
-        return '\n'.join(lines)
-    
-    def _convert_to_adblock_rule(self, rule: Rule) -> Optional[str]:
-        """Convert a single rule to AdBlock format"""
-        
-        if rule.rule_type == RuleType.ELEMENT_HIDING:
-            return rule.pattern
-        
-        if rule.rule_type == RuleType.SCRIPTLET:
-            return rule.pattern
-        
-        if rule.rule_type == RuleType.WHITELIST:
-            prefix = "@@"
+    def _parse_css_selector(self, line: str, line_number: int) -> None:
+        """Parse CSS selector rule"""
+        if '#@#' in line:
+            parts = line.split('#@#', 1)
+            action = Action.ALLOW
         else:
-            prefix = ""
+            parts = line.split('##', 1)
+            action = Action.BLOCK
         
-        if rule.rule_type in [RuleType.DOMAIN, RuleType.URL_PATTERN]:
-            # Build AdBlock pattern
-            pattern = f"{prefix}||{rule.pattern}^"
+        domain = parts[0] if parts[0] else None
+        selector = parts[1] if len(parts) > 1 else ""
+        
+        rule = Rule(
+            rule_type=RuleType.CSS_SELECTOR,
+            pattern=selector,
+            action=action,
+            modifiers={'domain': domain} if domain else {},
+            line_number=line_number,
+            raw_line=line
+        )
+        
+        self.rules.append(rule)
+    
+    def _parse_html_filter(self, line: str, line_number: int) -> None:
+        """Parse HTML filter rule"""
+        if '#@$#' in line:
+            parts = line.split('#@$#', 1)
+            action = Action.ALLOW
+        else:
+            parts = line.split('#$#', 1)
+            action = Action.BLOCK
+        
+        domain = parts[0] if parts[0] else None
+        filter_expr = parts[1] if len(parts) > 1 else ""
+        
+        rule = Rule(
+            rule_type=RuleType.HTML_FILTER,
+            pattern=filter_expr,
+            action=action,
+            modifiers={'domain': domain} if domain else {},
+            line_number=line_number,
+            raw_line=line
+        )
+        
+        self.rules.append(rule)
+    
+    def _parse_waf_rule(self, line: str, line_number: int) -> None:
+        """Parse WAF rule"""
+        line = line[2:].strip()  # Remove >>
+        
+        base_rule, parsed_modifiers = self.modifier_parser.parse(line)
+        modifiers = {mod.name: mod.value for mod in parsed_modifiers}
+        
+        severity = None
+        if 'severity' in modifiers:
+            try:
+                severity = Severity(modifiers['severity'].lower())
+            except ValueError:
+                pass
+        
+        rule = Rule(
+            rule_type=RuleType.WAF_RULE,
+            pattern=base_rule,
+            action=Action.DROP,
+            modifiers=modifiers,
+            severity=severity,
+            category=modifiers.get('category'),
+            comment=modifiers.get('msg'),
+            line_number=line_number,
+            raw_line=line
+        )
+        
+        self.rules.append(rule)
+    
+    def _parse_suricata_rule(self, line: str, line_number: int) -> None:
+        """Parse Suricata-style rule"""
+        # Extract action
+        action_match = re.match(r'^(alert|drop|reject|pass)\s+', line)
+        if not action_match:
+            return
+        
+        action_str = action_match.group(1)
+        action = Action.BLOCK if action_str in ('alert', 'drop', 'reject') else Action.ALLOW
+        
+        # Extract modifiers from parentheses
+        paren_match = re.search(r'\((.*?)\)', line)
+        if paren_match:
+            modifier_str = paren_match.group(1)
+            # Parse Suricata-style modifiers
+            modifiers = {}
+            for part in modifier_str.split(';'):
+                part = part.strip()
+                if ':' in part:
+                    key, value = part.split(':', 1)
+                    modifiers[key.strip()] = value.strip().strip('"')
+        else:
+            modifiers = {}
+        
+        rule = Rule(
+            rule_type=RuleType.SURICATA_RULE,
+            pattern=line,
+            action=action,
+            modifiers=modifiers,
+            comment=modifiers.get('msg'),
+            line_number=line_number,
+            raw_line=line
+        )
+        
+        self.rules.append(rule)
+    
+    def _detect_rule_type(self, pattern: str) -> RuleType:
+        """Detect type of rule from pattern"""
+        
+        # Check for regex patterns
+        if pattern.startswith('/') and pattern.endswith('/'):
+            return RuleType.REGEX
+        
+        # Check for URL patterns
+        if any(indicator in pattern for indicator in ['://', '||', '^', '*', '|']):
+            return RuleType.URL
+        
+        # Default to domain
+        return RuleType.DOMAIN
+    
+    def get_statistics(self) -> Dict:
+        """Get parsing statistics"""
+        stats = {
+            'total_rules': len(self.rules),
+            'errors': len(self.errors),
+            'warnings': len(self.warnings),
+            'by_type': {},
+            'by_action': {},
+            'by_severity': {}
+        }
+        
+        for rule in self.rules:
+            # Count by type
+            rule_type = rule.rule_type.value
+            stats['by_type'][rule_type] = stats['by_type'].get(rule_type, 0) + 1
             
-            # Add options
-            options = []
-            if 'third-party' in rule.modifiers:
-                options.append('third-party')
-            if 'script' in rule.modifiers:
-                options.append('script')
-            if 'image' in rule.modifiers:
-                options.append('image')
-            if 'xhr' in rule.modifiers:
-                options.append('xmlhttprequest')
-            if 'domain' in rule.modifiers:
-                domains = rule.modifiers['domain']
-                if isinstance(domains, list):
-                    domains = '|'.join(domains)
-                options.append(f'domain={domains}')
+            # Count by action
+            action = rule.action.value
+            stats['by_action'][action] = stats['by_action'].get(action, 0) + 1
             
-            if options:
-                pattern += '$' + ','.join(options)
-            
-            return pattern
+            # Count by severity
+            if rule.severity:
+                severity = rule.severity.value
+                stats['by_severity'][severity] = stats['by_severity'].get(severity, 0) + 1
         
-        return None
-    
-    def to_dnsmasq(self) -> str:
-        """Convert to dnsmasq format"""
-        lines = ["# Converted from UBS format"]
-        lines.append("")
-        
-        for rule in self.parser.rules:
-            if rule.rule_type == RuleType.DOMAIN and rule.modifiers.get('action') != 'allow':
-                pattern = rule.pattern.replace('*.', '')
-                if not rule.modifiers.get('regex'):
-                    lines.append(f"address=/{pattern}/0.0.0.0")
-        
-        return '\n'.join(lines)
-    
-    def to_unbound(self) -> str:
-        """Convert to Unbound format"""
-        lines = ["# Converted from UBS format"]
-        lines.append("server:")
-        
-        for rule in self.parser.rules:
-            if rule.rule_type == RuleType.DOMAIN and rule.modifiers.get('action') != 'allow':
-                pattern = rule.pattern.replace('*.', '')
-                if not rule.modifiers.get('regex'):
-                    lines.append(f'  local-zone: "{pattern}" always_nxdomain')
-        
-        return '\n'.join(lines)
-    
-    def to_bind(self) -> str:
-        """Convert to BIND zone format"""
-        lines = ["// Converted from UBS format"]
-        lines.append("")
-        
-        for rule in self.parser.rules:
-            if rule.rule_type == RuleType.DOMAIN and rule.modifiers.get('action') != 'allow':
-                pattern = rule.pattern.replace('*.', '')
-                if not rule.modifiers.get('regex'):
-                    lines.append(f'zone "{pattern}" {{ type master; file "/etc/bind/null.zone"; }};')
-        
-        return '\n'.join(lines)
-    
-    def to_squid(self) -> str:
-        """Convert to Squid ACL format"""
-        lines = ["# Converted from UBS format"]
-        lines.append("")
-        
-        for rule in self.parser.rules:
-            if rule.rule_type in [RuleType.DOMAIN, RuleType.URL_PATTERN]:
-                if rule.modifiers.get('action') != 'allow':
-                    pattern = rule.pattern.replace('*.', '.')
-                    lines.append(f".{pattern}")
-        
-        return '\n'.join(lines)
-    
-    def to_proxy_pac(self) -> str:
-        """Convert to Proxy Auto-Config (PAC) format"""
-        lines = [
-            'function FindProxyForURL(url, host) {',
-            '  // Converted from UBS format',
-            ''
-        ]
-        
-        proxy_rules = self.parser.get_rules_by_type(RuleType.PROXY)
-        block_rules = [r for r in self.parser.rules 
-                      if r.rule_type == RuleType.DOMAIN 
-                      and r.modifiers.get('action') != 'allow'
-                      and r.rule_type != RuleType.PROXY]
-        
-        # Add proxy routing rules
-        for rule in proxy_rules:
-            pattern = rule.pattern.replace('*.', '')
-            proxy = rule.modifiers.get('proxy', 'DIRECT')
-            lines.append(f'  if (shExpMatch(host, "*{pattern}*")) {{')
-            lines.append(f'    return "{proxy}";')
-            lines.append('  }')
-        
-        # Add blocked domains
-        if block_rules:
-            lines.append('')
-            lines.append('  // Blocked domains')
-            for rule in block_rules[:10]:  # Limit for PAC performance
-                pattern = rule.pattern.replace('*.', '')
-                lines.append(f'  if (shExpMatch(host, "*{pattern}*")) {{')
-                lines.append('    return "PROXY 127.0.0.1:1";  // Black hole')
-                lines.append('  }')
-        
-        lines.append('')
-        lines.append('  return "DIRECT";')
-        lines.append('}')
-        
-        return '\n'.join(lines)
-    
-    def to_suricata(self) -> str:
-        """Convert to Suricata rules format"""
-        lines = ["# Converted from UBS format"]
-        lines.append("")
-        
-        sid = 1000000  # Starting SID
-        
-        for rule in self.parser.rules:
-            if rule.rule_type == RuleType.SURICATA:
-                protocol = rule.modifiers.get('protocol', 'tcp')
-                port = rule.modifiers.get('port', 'any')
-                content = rule.modifiers.get('content', '')
-                msg = rule.modifiers.get('msg', 'UBS Rule')
-                severity = rule.modifiers.get('severity', 'medium')
-                
-                # Parse content for actual string
-                content_match = re.search(r'content:"([^"]+)"', content)
-                if content_match:
-                    content_str = content_match.group(1)
-                    lines.append(
-                        f'alert {protocol} any any -> any {port} '
-                        f'(msg:"{msg}"; content:"{content_str}"; '
-                        f'classtype:misc-activity; sid:{sid}; rev:1;)'
-                    )
-                    sid += 1
-            
-            elif rule.rule_type == RuleType.DOMAIN and rule.modifiers.get('severity'):
-                # Convert high-severity domains to Suricata rules
-                msg = f"Blocked domain: {rule.pattern}"
-                lines.append(
-                    f'alert dns any any -> any any '
-                    f'(msg:"{msg}"; dns_query; content:"{rule.pattern}"; '
-                    f'nocase; sid:{sid}; rev:1;)'
-                )
-                sid += 1
-        
-        return '\n'.join(lines)
-    
-    def to_little_snitch(self) -> str:
-        """Convert to Little Snitch JSON format"""
-        rules = []
-        
-        for rule in self.parser.rules:
-            if rule.rule_type == RuleType.DOMAIN:
-                action = "deny" if rule.modifiers.get('action') != 'allow' else "allow"
-                rules.append({
-                    "action": action,
-                    "process": "any",
-                    "remote-domains": rule.pattern.replace('*.', ''),
-                    "ports": "any",
-                    "protocol": "any",
-                    "notes": rule.section or "UBS Rule"
-                })
-        
-        return json.dumps({"name": self.parser.metadata.title or "UBS Rules", "rules": rules}, indent=2)
+        return stats
 
 
-# Example usage and CLI
-if __name__ == "__main__":
-    import sys
-    
-    # Example UBS content
-    example_ubs = """
-! Title: Example UBS Blocklist
-! Version: 1.0.0
-! Updated: 2025-10-10
-! License: MIT
-! Target: dns,browser,waf
+# ============================================================================
+# UTILITY FUNCTIONS
+# ============================================================================
 
-[Malware-Domains]
-evil-malware.com :severity=critical :category=malware
-*.phishing.net :action=block :log
+def parse_ubs_file(filepath: str) -> UBSParser:
+    """
+    Convenience function to parse a UBS file
+    
+    Args:
+        filepath: Path to UBS file
+        
+    Returns:
+        Parsed UBSParser object
+    """
+    with open(filepath, 'r', encoding='utf-8') as f:
+        content = f.read()
+    
+    parser = UBSParser()
+    parser.parse(content)
+    
+    return parser
+
+
+def parse_ubs_string(content: str) -> UBSParser:
+    """
+    Convenience function to parse UBS content string
+    
+    Args:
+        content: UBS file content as string
+        
+    Returns:
+        Parsed UBSParser object
+    """
+    parser = UBSParser()
+    parser.parse(content)
+    return parser
+
+
+# ============================================================================
+# TESTING & EXAMPLES
+# ============================================================================
+
+if __name__ == '__main__':
+    # Example UBS content with mixed syntax
+    test_content = """
+! Title: Test List
+! Version: 1.0
+! Expires: 1 day
 
 [Tracking]
-||analytics.google.com^ :third-party :category=tracker
-||facebook.com/tr/* :script
-facebook.com##div[id^="cookie"]
+||analytics.google.com^:third-party :category=tracker
+||facebook.com/tr/*$script :log
 
-[Proxy-Rules]
-||internal.company.com :proxy=DIRECT
-*.onion :proxy=SOCKS5 127.0.0.1:9050
+[Malware]
+evil-malware.com :severity=critical :category=malware
+*.phishing.net :action=block
+
+[Ad-Blocking]
+||ads.example.com^$third-party,script
+/banner-ads/*$domain=~advertiser.com
 
 [Whitelist]
-@||paypal.com^
-@@||cdn.cloudflare.com^ :first-party
-
-[WAF-Rules]
->>http content:"<script>" :severity=high :msg="XSS Attempt"
+@@||paypal.com^ :reason="Payment processor"
+@@||cdn.cloudflare.com^$first-party
 """
     
-    print("=== UBS Parser & Converter Demo ===\n")
+    print("="*80)
+    print("UBS PARSER TEST - Flexible Modifier Syntax")
+    print("="*80)
     
     # Parse
-    parser = UBSParser()
-    parser.parse(example_ubs)
+    parser = UBSParser(strict_syntax=False)
+    parser.parse(test_content)
     
-    print(f"Parsed {len(parser.rules)} rules")
-    print(f"Metadata: {parser.metadata.title} v{parser.metadata.version}\n")
+    # Print statistics
+    stats = parser.get_statistics()
+    print(f"\n📊 Statistics:")
+    print(f"   Total Rules: {stats['total_rules']}")
+    print(f"   Errors: {stats['errors']}")
+    print(f"   Warnings: {stats['warnings']}")
     
+    print(f"\n📋 By Type:")
+    for rule_type, count in stats['by_type'].items():
+        print(f"   {rule_type}: {count}")
+    
+    print(f"\n⚡ By Action:")
+    for action, count in stats['by_action'].items():
+        print(f"   {action}: {count}")
+    
+    # Print errors and warnings
     if parser.errors:
-        print(f"Errors: {len(parser.errors)}")
+        print(f"\n❌ Errors:")
         for error in parser.errors:
-            print(f"  - {error}")
-        print()
+            print(f"   {error}")
     
-    # Convert
-    converter = UBSConverter(parser)
+    # if parser.warnings:
+    #     print(f"\n⚠️  Warnings:".encode('utf-8', 'replace').decode())
+    #     for warning in parser.warnings:
+    #         print(f"   {warning}")
     
-    print("--- Hosts Format ---")
-    print(converter.to_hosts()[:500])
-    print("\n--- AdBlock Format ---")
-    print(converter.to_adblock()[:500])
-    print("\n--- Dnsmasq Format ---")
-    print(converter.to_dnsmasq()[:500])
-    print("\n--- JSON Export ---")
-    print(parser.to_json()[:500])
+    # Adjusted for terminal output
+    if parser.warnings:
+        print("\n⚠️  Warnings:")
+        for warning in parser.warnings:
+            try:
+                print(f"   {warning}")
+            except UnicodeEncodeError:
+                print(f"   {warning.encode('utf-8', 'replace').decode()}")
+
+    # Print sample rules
+    print(f"\n📝 Sample Rules:")
+    for i, rule in enumerate(parser.rules[:5], 1):
+        print(f"\n   Rule {i}:")
+        print(f"   Type: {rule.rule_type.value}")
+        print(f"   Pattern: {rule.pattern}")
+        print(f"   Action: {rule.action.value}")
+        print(f"   Modifiers: {rule.modifiers}")
+        if rule.severity:
+            print(f"   Severity: {rule.severity.value}")
+    
+    print("\n" + "="*80)
