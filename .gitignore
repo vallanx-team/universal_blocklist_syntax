@@ -227,5 +227,6 @@ composer.json
 composer.lock
 
 *.md
+!docs/*
 !README.md
 !CHANGELOG.md
