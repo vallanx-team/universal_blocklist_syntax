@@ -85,6 +85,7 @@ class Rule:
     comment: Optional[str] = None
     line_number: int = 0
     raw_line: str = ""
+    section: Optional[str] = None
 
 
 @dataclass
@@ -98,6 +99,7 @@ class Metadata:
     last_modified: Optional[datetime] = None
     author: Optional[str] = None
     license: Optional[str] = None
+    targets: List[str] = field(default_factory=list)
 
 
 # ============================================================================
@@ -347,6 +349,11 @@ class UBSParser:
         
         # Flexible modifier parser
         self.modifier_parser = FlexibleModifierParser(strict_syntax=strict_syntax)
+
+    def _append_rule(self, rule: Rule) -> None:
+        """Append a rule, stamping it with the current section."""
+        rule.section = self.current_section
+        self.rules.append(rule)
     
     def parse(self, content: str) -> None:
         """
@@ -499,7 +506,7 @@ class UBSParser:
             raw_line=line
         )
         
-        self.rules.append(rule)
+        self._append_rule(rule)
     
     def _parse_exception_rule(self, line: str, line_number: int) -> None:
         """Parse exception rule (whitelist)"""
@@ -517,7 +524,7 @@ class UBSParser:
             raw_line=line
         )
         
-        self.rules.append(rule)
+        self._append_rule(rule)
     
     def _parse_css_selector(self, line: str, line_number: int) -> None:
         """Parse CSS selector rule"""
@@ -540,7 +547,7 @@ class UBSParser:
             raw_line=line
         )
         
-        self.rules.append(rule)
+        self._append_rule(rule)
     
     def _parse_html_filter(self, line: str, line_number: int) -> None:
         """Parse HTML filter rule"""
@@ -563,7 +570,7 @@ class UBSParser:
             raw_line=line
         )
         
-        self.rules.append(rule)
+        self._append_rule(rule)
     
     def _parse_waf_rule(self, line: str, line_number: int) -> None:
         """Parse WAF rule"""
@@ -591,7 +598,7 @@ class UBSParser:
             raw_line=line
         )
         
-        self.rules.append(rule)
+        self._append_rule(rule)
     
     def _parse_suricata_rule(self, line: str, line_number: int) -> None:
         """Parse Suricata-style rule"""
@@ -627,7 +634,7 @@ class UBSParser:
             raw_line=line
         )
         
-        self.rules.append(rule)
+        self._append_rule(rule)
     
     def _detect_rule_type(self, pattern: str) -> RuleType:
         """Detect type of rule from pattern"""

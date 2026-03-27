@@ -436,7 +436,7 @@ class ListMerger:
             parsers: Dict of {name: parser_object}
             priority_order: List of names in priority order (highest first)
         """
-        from ubs_parser import UBSParser, ParsedRule, Metadata
+        from ubs_parser import UBSParser, Rule, Metadata
         
         if not parsers:
             raise ValueError("No parsers provided")
@@ -485,8 +485,7 @@ class ListMerger:
                         elif self.conflict_strategy == 'merge':
                             # Merge modifiers
                             existing = seen_rules[rule_key]
-                            merged_modifiers = list(set(existing.modifiers + rule.modifiers))
-                            existing.modifiers = merged_modifiers
+                            existing.modifiers = {**existing.modifiers, **rule.modifiers}
                     else:
                         seen_rules[rule_key] = rule
                 else:

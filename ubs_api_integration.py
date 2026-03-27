@@ -9,6 +9,7 @@ UBS REST API & Integration Module
 
 import json
 import hashlib
+import hmac
 import time
 import threading
 from pathlib import Path
@@ -43,7 +44,8 @@ class APIResponse:
 class UBSAPIHandler(BaseHTTPRequestHandler):
     """HTTP request handler for UBS API"""
     
-    # Class-level storage (in production, use a database)
+    # Class-level storage — capped to avoid unbounded memory growth
+    _CACHE_MAX = 20
     parsers_cache = {}
     validation_cache = {}
     
@@ -131,8 +133,10 @@ class UBSAPIHandler(BaseHTTPRequestHandler):
             parser = UBSParser()
             parser.parse(content)
             
-            # Cache the parser
+            # Cache the parser (evict oldest entry when cap is reached)
             cache_key = hashlib.md5(content.encode()).hexdigest()
+            if len(self.parsers_cache) >= self._CACHE_MAX:
+                self.parsers_cache.pop(next(iter(self.parsers_cache)))
             self.parsers_cache[cache_key] = parser
             
             response_data = {
@@ -141,7 +145,7 @@ class UBSAPIHandler(BaseHTTPRequestHandler):
                 'metadata': {
                     'title': parser.metadata.title,
                     'version': parser.metadata.version,
-                    'targets': list(parser.metadata.targets)
+                    'targets': list(getattr(parser.metadata, 'targets', []))
                 },
                 'rules': [rule.to_dict() for rule in parser.rules[:100]],  # Limit for response size
                 'errors': parser.errors
@@ -480,8 +484,10 @@ class WebhookManager:
         
         # Add signature if secret is set
         if webhook.secret:
-            signature = hashlib.sha256(
-                f"{webhook.secret}{json.dumps(payload)}".encode()
+            signature = hmac.new(
+                webhook.secret.encode(),
+                json.dumps(payload).encode(),
+                hashlib.sha256
             ).hexdigest()
             headers = {
                 'Content-Type': 'application/json',

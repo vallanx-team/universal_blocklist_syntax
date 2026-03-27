@@ -1,0 +1,1260 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Universal Blocklist Syntax (UBS) - Complete Documentation v3.0</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background: #f5f7fa;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 60px 40px;
+            border-radius: 15px;
+            margin-bottom: 40px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            text-align: center;
+        }
+        
+        header h1 {
+            font-size: 3em;
+            margin-bottom: 15px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+            color: rgba(255, 255, 255, .8);
+        }
+        
+        header .version {
+            font-size: 1.5em;
+            opacity: 0.9;
+            margin-bottom: 10px;
+        }
+        
+        header .tagline {
+            font-size: 1.2em;
+            opacity: 0.8;
+        }
+        
+        nav {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 30px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            position: sticky;
+            top: 20px;
+            z-index: 100;
+        }
+        
+        nav h3 {
+            color: #667eea;
+            margin-bottom: 15px;
+        }
+        
+        nav ul {
+            list-style: none;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 10px;
+        }
+        
+        nav a {
+            color: #667eea;
+            text-decoration: none;
+            padding: 8px 12px;
+            display: block;
+            border-radius: 5px;
+            transition: all 0.3s;
+        }
+        
+        nav a:hover {
+            background: #667eea;
+            color: white;
+            transform: translateX(5px);
+        }
+        
+        section {
+            background: white;
+            padding: 40px;
+            border-radius: 10px;
+            margin-bottom: 30px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        h1, h2, h3, h4 {
+            color: #2d3748;
+            margin-top: 30px;
+            margin-bottom: 15px;
+        }
+        
+        h1 { font-size: 2.5em; color: #667eea; border-bottom: 3px solid #667eea; padding-bottom: 10px; }
+        h2 { font-size: 2em; color: #764ba2; }
+        h3 { font-size: 1.5em; }
+        h4 { font-size: 1.2em; }
+        
+        .module-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin: 30px 0;
+        }
+        
+        .module-card {
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            padding: 25px;
+            border-radius: 10px;
+            border-left: 5px solid #667eea;
+            transition: transform 0.3s, box-shadow 0.3s;
+        }
+        
+        .module-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 5px 20px rgba(0,0,0,0.15);
+        }
+        
+        .module-card h3 {
+            color: #667eea;
+            margin-top: 0;
+        }
+        
+        .module-card ul {
+            list-style: none;
+            padding-left: 0;
+        }
+        
+        .module-card li:before {
+            content: "✓ ";
+            color: #48bb78;
+            font-weight: bold;
+        }
+        
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin: 30px 0;
+        }
+        
+        .stat-card {
+            background: white;
+            padding: 25px;
+            border-radius: 10px;
+            text-align: center;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            border-top: 4px solid #667eea;
+        }
+        
+        .stat-value {
+            font-size: 3em;
+            font-weight: bold;
+            color: #667eea;
+            margin: 10px 0;
+        }
+        
+        .stat-label {
+            color: #718096;
+            font-size: 0.9em;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        
+        pre {
+            background: #2d3748;
+            color: #e2e8f0;
+            padding: 20px;
+            border-radius: 8px;
+            overflow-x: auto;
+            margin: 20px 0;
+            border-left: 4px solid #667eea;
+        }
+        
+        code {
+            background: #f7fafc;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: 'Monaco', 'Courier New', monospace;
+            color: #e53e3e;
+        }
+        
+        pre code {
+            background: transparent;
+            color: #e2e8f0;
+            padding: 0;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        th, td {
+            padding: 15px;
+            text-align: left;
+            border-bottom: 1px solid #e2e8f0;
+        }
+        
+        th {
+            background: #667eea;
+            color: white;
+            font-weight: 600;
+            text-transform: uppercase;
+            font-size: 0.9em;
+            letter-spacing: 1px;
+        }
+        
+        tr:hover {
+            background: #f7fafc;
+        }
+        
+        .badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 0.85em;
+            font-weight: 600;
+            margin: 2px;
+        }
+        
+        .badge-new {
+            background: #48bb78;
+            color: white;
+        }
+        
+        .badge-ml {
+            background: #667eea;
+            color: white;
+        }
+        
+        .badge-feature {
+            background: #ed8936;
+            color: white;
+        }
+        
+        .highlight-box {
+            background: linear-gradient(135deg, #fef5e7 0%, #fdebd0 100%);
+            border-left: 5px solid #f39c12;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 5px;
+        }
+        
+        .highlight-box h4 {
+            color: #f39c12;
+            margin-top: 0;
+        }
+        
+        .feature-list {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 15px;
+            margin: 20px 0;
+        }
+        
+        .feature-item {
+            background: #f7fafc;
+            padding: 15px;
+            border-radius: 8px;
+            border-left: 3px solid #48bb78;
+        }
+        
+        .feature-item:before {
+            content: "✓";
+            color: #48bb78;
+            font-weight: bold;
+            margin-right: 10px;
+            font-size: 1.2em;
+        }
+        
+        .command-example {
+            background: #2d3748;
+            color: #48bb78;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 10px 0;
+            font-family: 'Monaco', 'Courier New', monospace;
+        }
+        
+        .command-example:before {
+            content: "$ ";
+            color: #667eea;
+        }
+        
+        footer {
+            background: #2d3748;
+            color: white;
+            padding: 40px;
+            border-radius: 10px;
+            margin-top: 40px;
+            text-align: center;
+        }
+        
+        footer a {
+            color: #667eea;
+            text-decoration: none;
+        }
+        
+        .toc {
+            background: #f7fafc;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+        
+        .toc h3 {
+            color: #667eea;
+            margin-top: 0;
+        }
+        
+        .toc ul {
+            list-style: none;
+            padding-left: 20px;
+        }
+        
+        .toc a {
+            color: #2d3748;
+            text-decoration: none;
+            display: block;
+            padding: 5px 0;
+        }
+        
+        .toc a:hover {
+            color: #667eea;
+            padding-left: 5px;
+        }
+        
+        @media print {
+            body { background: white; }
+            section { box-shadow: none; page-break-inside: avoid; }
+            nav { display: none; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🛡️ Universal Blocklist Syntax</h1>
+            <div class="version">Complete Documentation v3.0</div>
+            <div class="tagline">The Most Complete Content Filtering Solution with Machine Learning</div>
+        </header>
+
+        <nav>
+            <h3>📑 Quick Navigation</h3>
+            <ul>
+                <li><a href="#modules">Modules</a></li>
+                <li><a href="#features">Features</a></li>
+                <li><a href="#cli">CLI Commands</a></li>
+                <li><a href="#ml">Machine Learning</a></li>
+                <li><a href="#api">Python API</a></li>
+                <li><a href="#examples">Examples</a></li>
+                <li><a href="#performance">Performance</a></li>
+                <li><a href="#ttl">TTL Extension</a></li>
+                <li><a href="#troubleshooting">Troubleshooting</a></li>
+            </ul>
+        </nav>
+
+        <section id="overview">
+            <h1>📦 Overview</h1>
+            
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-label">Modules</div>
+                    <div class="stat-value">11</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Features</div>
+                    <div class="stat-value">120+</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Export Formats</div>
+                    <div class="stat-value">21</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">CLI Commands</div>
+                    <div class="stat-value">30+</div>
+                </div>
+<!--                 <div class="stat-card">
+                    <div class="stat-label">Lines of Code</div>
+                    <div class="stat-value">7,500</div>
+                </div> -->
+                <div class="stat-card">
+                    <div class="stat-label">Dependencies</div>
+                    <div class="stat-value">0</div>
+                </div>
+            </div>
+
+            <div class="highlight-box">
+                <h4>🎉 What's New in v3.0</h4>
+                <p><strong>Machine Learning Module Added!</strong> Auto-categorization, pattern recognition, anomaly detection, and intelligent rule suggestions with zero external dependencies.</p>
+            </div>
+        </section>
+
+        <section id="modules">
+            <h1>🎯 All 11 Modules</h1>
+            
+            <div class="module-grid">
+                <div class="module-card">
+                    <h3>1. ubs_parser.py</h3>
+                    <p><strong>Core Module</strong></p>
+                    <ul>
+                        <li>Parse UBS syntax</li>
+                        <li>9 basic converters</li>
+                        <li>JSON export</li>
+                        <li>Error handling</li>
+                    </ul>
+                </div>
+
+                <div class="module-card">
+                    <h3>2. ubs_advanced_features.py</h3>
+                    <p><strong>Validation & Testing</strong></p>
+                    <ul>
+                        <li>Rule validator</li>
+                        <li>DNS checks</li>
+                        <li>URL tester</li>
+                        <li>List merger</li>
+                        <li>Extension generator</li>
+                    </ul>
+                </div>
+
+                <div class="module-card">
+                    <h3>3. ubs_performance_optimization.py</h3>
+                    <p><strong>Performance</strong></p>
+                    <ul>
+                        <li>Bloom filter</li>
+                        <li>Domain trie</li>
+                        <li>Rule optimizer</li>
+                        <li>List differ</li>
+                        <li>11 extended converters</li>
+                    </ul>
+                </div>
+
+                <div class="module-card">
+                    <h3>4. ubs_smart_converter.py</h3>
+                    <p><strong>Smart Conversion</strong></p>
+                    <ul>
+                        <li>Auto format detection</li>
+                        <li>Format optimization</li>
+                        <li>Batch conversion</li>
+                        <li>21 formats support</li>
+                    </ul>
+                </div>
+
+                <div class="module-card">
+                    <h3>5. ubs_api_integration.py</h3>
+                    <p><strong>API & Integration</strong></p>
+                    <ul>
+                        <li>REST API server</li>
+                        <li>Webhook manager</li>
+                        <li>Auto-update system</li>
+                        <li>GitHub integration</li>
+                    </ul>
+                </div>
+
+                <div class="module-card">
+                    <h3>6. ubs_doc_generator.py</h3>
+                    <p><strong>Documentation</strong></p>
+                    <ul>
+                        <li>Markdown docs</li>
+                        <li>HTML reports</li>
+                        <li>JSON export</li>
+                        <li>Quick reference</li>
+                    </ul>
+                </div>
+
+                <div class="module-card">
+                    <h3>7. ubs_testing_simulation.py</h3>
+                    <p><strong>Testing & Simulation</strong></p>
+                    <ul>
+                        <li>Traffic simulator</li>
+                        <li>Benchmarks</li>
+                        <li>False-positive detection</li>
+                        <li>Performance metrics</li>
+                    </ul>
+                </div>
+
+                <div class="module-card">
+                    <h3>8. ubs_analytics_reporting.py</h3>
+                    <p><strong>Analytics</strong></p>
+                    <ul>
+                        <li>Statistics generator</li>
+                        <li>ASCII visualizations</li>
+                        <li>HTML dashboard</li>
+                        <li>Coverage reports</li>
+                    </ul>
+                </div>
+
+                <div class="module-card">
+                    <h3>9. ubs_config_system.py</h3>
+                    <p><strong>Configuration</strong></p>
+                    <ul>
+                        <li>YAML/JSON support</li>
+                        <li>Profile management</li>
+                        <li>Auto-loading</li>
+                        <li>CLI integration</li>
+                    </ul>
+                </div>
+
+                <div class="module-card" style="border-left-color: #48bb78; background: linear-gradient(135deg, #e8f5e9 0%, #c8e6c9 100%);">
+                    <h3>10. ubs_machine_learning.py <span class="badge badge-new">NEW!</span></h3>
+                    <p><strong>Machine Learning</strong></p>
+                    <ul>
+                        <li>Auto-categorization</li>
+                        <li>Pattern recognition</li>
+                        <li>Rule suggestions</li>
+                        <li>Anomaly detection</li>
+                        <li>Risk scoring</li>
+                    </ul>
+                </div>
+
+                <div class="module-card" style="border-left-color: #38b2ac; background: linear-gradient(135deg, #e6fffa 0%, #b2f5ea 100%);">
+                    <h3>11. ubs_ttl_extension.py <span class="badge badge-new">NEW!</span></h3>
+                    <p><strong>TTL Extension</strong></p>
+                    <ul>
+                        <li>Per-rule TTL support</li>
+                        <li>TTL-aware converters</li>
+                        <li>Unbound / BIND / dnsmasq</li>
+                        <li>Pi-hole / CoreDNS output</li>
+                        <li>TTL analysis report</li>
+                    </ul>
+                </div>
+            </div>
+        </section>
+
+        <section id="features">
+            <h1>✨ Complete Feature List (120+)</h1>
+            
+            <h2>Core Features</h2>
+            <div class="feature-list">
+                <div class="feature-item">Parse UBS syntax (8 types)</div>
+                <div class="feature-item">Metadata extraction</div>
+                <div class="feature-item">Section support</div>
+                <div class="feature-item">Modifier parsing</div>
+                <div class="feature-item">Syntax validation</div>
+                <div class="feature-item">DNS checks (parallel)</div>
+                <div class="feature-item">URL testing</div>
+                <div class="feature-item">Batch processing</div>
+            </div>
+
+            <h2>Performance & Optimization</h2>
+            <div class="feature-list">
+                <div class="feature-item">Bloom filter (O(1) lookups)</div>
+                <div class="feature-item">Domain trie structure</div>
+                <div class="feature-item">Regex caching</div>
+                <div class="feature-item">Rule deduplication</div>
+                <div class="feature-item">Wildcard merging</div>
+                <div class="feature-item">Performance sorting</div>
+            </div>
+
+            <h2>Machine Learning <span class="badge badge-new">NEW!</span></h2>
+            <div class="feature-list">
+                <div class="feature-item">Feature extraction</div>
+                <div class="feature-item">Auto-categorization</div>
+                <div class="feature-item">Pattern recognition</div>
+                <div class="feature-item">Rule suggestions</div>
+                <div class="feature-item">Anomaly detection</div>
+                <div class="feature-item">Risk scoring (0-100)</div>
+                <div class="feature-item">Threat level determination</div>
+                <div class="feature-item">DGA domain detection</div>
+            </div>
+
+            <h2>Export Formats (21 Total)</h2>
+            <table>
+                <tr>
+                    <th>Format</th>
+                    <th>Platform</th>
+                    <th>Type</th>
+                </tr>
+                <tr><td>Hosts</td><td>Universal</td><td>DNS</td></tr>
+                <tr><td>AdBlock</td><td>Browsers</td><td>Browser</td></tr>
+                <tr><td>Pi-hole</td><td>Network</td><td>DNS</td></tr>
+                <tr><td>pfSense</td><td>Firewall</td><td>Network</td></tr>
+                <tr><td>ModSecurity</td><td>Web Server</td><td>WAF</td></tr>
+                <tr><td>Cloudflare WAF</td><td>Cloud</td><td>WAF</td></tr>
+                <tr><td>AWS WAF</td><td>Cloud</td><td>WAF</td></tr>
+                <tr><td colspan="3"><em>... and 14 more formats</em></td></tr>
+            </table>
+        </section>
+
+        <section id="cli">
+            <h1>🔧 CLI Commands (30+)</h1>
+            
+            <h2>Configuration</h2>
+            <div class="command-example">ubs-tool config-show</div>
+            <div class="command-example">ubs-tool config-init --output ubs-config.yaml</div>
+            <div class="command-example">ubs-tool profile load production</div>
+
+            <h2>Validation & Testing</h2>
+            <div class="command-example">ubs-tool validate rules.ubs --strict --check-dns</div>
+            <div class="command-example">ubs-tool test rules.ubs --url https://ads.example.com</div>
+            <div class="command-example">ubs-tool simulate rules.ubs --requests 10000</div>
+
+            <h2>Conversion</h2>
+            <div class="command-example">ubs-tool convert-all rules.ubs --output ./output/</div>
+            <div class="command-example">ubs-tool smart-convert rules.ubs blocklist.hosts</div>
+
+            <h2>Machine Learning <span class="badge badge-ml">ML</span></h2>
+            <div class="command-example">ubs-tool ml-categorize rules.ubs --input domains.txt</div>
+            <div class="command-example">ubs-tool ml-suggest rules.ubs --input domains.txt --output suggested.ubs</div>
+            <div class="command-example">ubs-tool ml-detect-anomalies rules.ubs --input domains.txt</div>
+            <div class="command-example">ubs-tool ml-analyze rules.ubs --input domains.txt --export-rules ml-rules.ubs</div>
+        </section>
+
+        <section id="ml">
+            <h1>🤖 Machine Learning Features</h1>
+            
+            <h2>Auto-Categorization</h2>
+            <p>Automatically categorize domains into tracking, ads, malware, cdn, social, and other categories using machine learning.</p>
+            
+            <pre><code class="language-python">from ubs_machine_learning import DomainCategorizer
+
+categorizer = DomainCategorizer()
+categorizer.train_from_parser(parser)
+
+prediction = categorizer.predict_category("tracking-pixel.com")
+print(f"Category: {prediction.predicted_category}")
+print(f"Confidence: {prediction.confidence:.2f}")</code></pre>
+
+            <h2>Pattern Recognition</h2>
+            <p>Detect tracking and malware patterns using heuristics and signatures.</p>
+            
+            <pre><code class="language-python">from ubs_machine_learning import PatternRecognizer
+
+recognizer = PatternRecognizer()
+analysis = recognizer.analyze_domain("suspicious-domain.tk")
+print(f"Classification: {analysis['classification']}")
+print(f"Confidence: {analysis['confidence']:.2f}")</code></pre>
+
+            <h2>Anomaly Detection</h2>
+            <p>Detect DGA domains and unusual patterns using statistical analysis.</p>
+            
+            <pre><code class="language-python">from ubs_machine_learning import AnomalyDetector
+
+detector = AnomalyDetector()
+detector.train_baseline(parser)
+
+anomalies = detector.detect_anomalies("xkcdlksjdflkj.tk")
+for anomaly in anomalies:
+    print(f"{anomaly.anomaly_type}: {anomaly.description}")</code></pre>
+
+            <h2>Risk Scoring</h2>
+            <table>
+                <tr>
+                    <th>Score Range</th>
+                    <th>Threat Level</th>
+                    <th>Recommendation</th>
+                </tr>
+                <tr style="background: #fee;">
+                    <td>80-100</td>
+                    <td>🔴 CRITICAL</td>
+                    <td>Block immediately</td>
+                </tr>
+                <tr style="background: #ffe;">
+                    <td>60-80</td>
+                    <td>🟠 HIGH</td>
+                    <td>Block recommended</td>
+                </tr>
+                <tr style="background: #ffa;">
+                    <td>40-60</td>
+                    <td>🟡 MEDIUM</td>
+                    <td>Monitor and review</td>
+                </tr>
+                <tr style="background: #efe;">
+                    <td>20-40</td>
+                    <td>🟢 LOW</td>
+                    <td>Review manually</td>
+                </tr>
+                <tr>
+                    <td>0-20</td>
+                    <td>⚪ MINIMAL</td>
+                    <td>Likely safe</td>
+                </tr>
+            </table>
+        </section>
+
+        <section id="api">
+            <h1>🔬 Python API Examples</h1>
+            
+            <h2>Basic Usage</h2>
+            <pre><code class="language-python">from ubs_parser import UBSParser, UBSConverter
+
+# Parse UBS file
+parser = UBSParser()
+with open('rules.ubs', 'r') as f:
+    parser.parse(f.read())
+
+# Convert to hosts format
+converter = UBSConverter(parser)
+hosts = converter.to_hosts()
+print(hosts)</code></pre>
+
+            <h2>Advanced ML Analysis</h2>
+            <pre><code class="language-python">from ubs_machine_learning import AdvancedMLAnalyzer
+
+# Create analyzer with trained models
+analyzer = AdvancedMLAnalyzer(parser)
+
+# Comprehensive analysis
+result = analyzer.analyze_domain_comprehensive("suspicious.com")
+print(f"Risk Score: {result['risk_score']:.1f}/100")
+print(f"Threat Level: {result['threat_level']}")
+print(f"Recommendation: {result['recommendation']}")
+
+# Batch analysis and report
+domains = ["domain1.com", "malware.tk", "tracker.net"]
+analyses = analyzer.batch_analyze(domains)
+analyzer.generate_report(analyses, "report.txt")
+analyzer.export_suggested_rules(analyses, "rules.ubs")</code></pre>
+        </section>
+
+        <section id="examples">
+            <h1>💡 Complete Workflow Examples</h1>
+            
+            <h2>ML-Enhanced Security Pipeline</h2>
+            <pre><code class="language-bash">#!/bin/bash
+# Complete ML-enhanced security pipeline
+
+# 1. Load production config
+ubs-tool profile load production
+
+# 2. Merge existing lists
+ubs-tool merge corporate.ubs security.ubs malware.ubs --output base.ubs
+
+# 3. Validate thoroughly
+ubs-tool validate base.ubs --strict --check-dns
+
+# 4. ML Analysis - Categorize new domains
+ubs-tool ml-categorize base.ubs --input new-domains.txt --threshold 0.7
+
+# 5. ML Analysis - Suggest rules
+ubs-tool ml-suggest base.ubs --input new-domains.txt --output ml-suggested.ubs
+
+# 6. ML Analysis - Comprehensive
+ubs-tool ml-analyze base.ubs --input new-domains.txt --export-rules ml-rules.ubs
+
+# 7. Merge ML-suggested rules
+ubs-tool merge base.ubs ml-rules.ubs --output enhanced.ubs
+
+# 8. Final optimization
+ubs-tool optimize enhanced.ubs --output final.ubs --aggressive
+
+# 9. Generate analytics
+ubs-tool analytics final.ubs --format all --charts
+
+# 10. Convert to all formats
+ubs-tool convert-all final.ubs --output ./production/
+
+echo "✅ Pipeline Complete!"</code></pre>
+        </section>
+
+        <section id="performance">
+            <h1>📊 Performance Benchmarks</h1>
+            
+            <h2>ML Performance</h2>
+            <table>
+                <tr>
+                    <th>Operation</th>
+                    <th>Time</th>
+                    <th>Accuracy</th>
+                </tr>
+                <tr>
+                    <td>Feature extraction</td>
+                    <td>&lt;1ms per domain</td>
+                    <td>-</td>
+                </tr>
+                <tr>
+                    <td>Categorization</td>
+                    <td>~2ms per domain</td>
+                    <td>~85%</td>
+                </tr>
+                <tr>
+                    <td>Pattern recognition</td>
+                    <td>~3ms per domain</td>
+                    <td>~90%</td>
+                </tr>
+                <tr>
+                    <td>Anomaly detection</td>
+                    <td>~1ms per domain</td>
+                    <td>~88%</td>
+                </tr>
+                <tr>
+                    <td>Comprehensive analysis</td>
+                    <td>~10ms per domain</td>
+                    <td>~87%</td>
+                </tr>
+                <tr>
+                    <td>Batch (1000 domains)</td>
+                    <td>~5-10 seconds</td>
+                    <td>-</td>
+                </tr>
+            </table>
+
+            <h2>Traditional Performance</h2>
+            <table>
+                <tr>
+                    <th>Rules Count</th>
+                    <th>Parse</th>
+                    <th>Lookup</th>
+                    <th>Convert</th>
+                </tr>
+                <tr>
+                    <td>1,000</td>
+                    <td>~50ms</td>
+                    <td>&lt;1ms</td>
+                    <td>~100ms</td>
+                </tr>
+                <tr>
+                    <td>10,000</td>
+                    <td>~500ms</td>
+                    <td>&lt;1ms</td>
+                    <td>~200ms</td>
+                </tr>
+                <tr>
+                    <td>100,000</td>
+                    <td>~5s</td>
+                    <td>~2ms</td>
+                    <td>~2s</td>
+                </tr>
+                <tr>
+                    <td>1,000,000</td>
+                    <td>~50s</td>
+                    <td>~5ms</td>
+                    <td>~20s</td>
+                </tr>
+            </table>
+        </section>
+
+        <section id="ttl">
+            <h1>⏱️ TTL Extension (Module 11)</h1>
+
+            <div class="highlight-box">
+                <h4>What is the TTL Extension?</h4>
+                <p>The <code>ubs_ttl_extension.py</code> module extends <code>UBSConverter</code> with per-rule TTL (Time To Live) support. It is a standalone file — <strong>ubs_parser.py stays completely untouched</strong>. Just swap <code>UBSConverter</code> for <code>UBSConverterTTL</code> and you gain full TTL-aware output.</p>
+            </div>
+
+            <h2>UBS Syntax with TTL</h2>
+            <pre><code># Short TTL for critical malware (1 minute)
+malware.com :ttl=60 :severity=critical
+
+# Standard TTL for trackers (5 minutes)
+tracker.com :ttl=300 :category=tracker
+
+# Long TTL for stable blocklists (1 hour)
+stable-ad.com :ttl=3600
+
+# Very long TTL for permanent blocks (24 hours)
+spam.com :ttl=86400
+
+# Combined with actions
+bad-cdn.com :action=null :ttl=600
+
+# Without TTL → uses default (300 s)
+default-domain.com</code></pre>
+
+            <h2>Quick Start</h2>
+            <pre><code>from ubs_parser import UBSParser
+from ubs_ttl_extension import UBSConverterTTL
+
+parser = UBSParser()
+parser.parse(open('rules.ubs').read())
+
+converter = UBSConverterTTL(parser)
+
+# TTL-specific formats
+print(converter.to_unbound_ttl())
+print(converter.to_dnsmasq_ttl())
+print(converter.to_bind_ttl())
+print(converter.to_pihole_ttl())
+print(converter.to_coredns_ttl())
+print(converter.to_ttl_report())</code></pre>
+
+            <h2>Convenience Function</h2>
+            <pre><code>from ubs_ttl_extension import convert_with_ttl
+
+# Formats: unbound, bind, dnsmasq, pihole, coredns, report
+result = convert_with_ttl(open('rules.ubs').read(), format='unbound')</code></pre>
+
+            <h2>Migration: 2 Lines to Change</h2>
+            <table>
+                <tr>
+                    <th>Before</th>
+                    <th>After</th>
+                </tr>
+                <tr>
+                    <td><code>from ubs_parser import UBSParser, UBSConverter</code></td>
+                    <td><code>from ubs_parser import UBSParser</code><br><code>from ubs_ttl_extension import UBSConverterTTL</code></td>
+                </tr>
+                <tr>
+                    <td><code>converter = UBSConverter(parser)</code></td>
+                    <td><code>converter = UBSConverterTTL(parser)</code></td>
+                </tr>
+            </table>
+            <p>All original methods (<code>to_hosts()</code>, <code>to_adblock()</code>, etc.) continue to work unchanged. <code>to_unbound()</code>, <code>to_bind()</code>, and <code>to_dnsmasq()</code> automatically use TTL when <code>:ttl=</code> modifiers are present.</p>
+
+            <h2>Available Methods</h2>
+            <table>
+                <tr>
+                    <th>Method</th>
+                    <th>Format</th>
+                    <th>Notes</th>
+                </tr>
+                <tr><td><code>to_unbound_ttl()</code></td><td>Unbound</td><td>local-data with TTL per record</td></tr>
+                <tr><td><code>to_bind_ttl()</code></td><td>BIND</td><td>Zones grouped by TTL value</td></tr>
+                <tr><td><code>to_dnsmasq_ttl()</code></td><td>dnsmasq</td><td>address=/domain/ip#ttl</td></tr>
+                <tr><td><code>to_pihole_ttl()</code></td><td>Pi-hole</td><td>Blocklist + TTL recommendations</td></tr>
+                <tr><td><code>to_coredns_ttl()</code></td><td>CoreDNS</td><td>Corefile template with TTL</td></tr>
+                <tr><td><code>to_ttl_report()</code></td><td>Report</td><td>Distribution, stats, recommendations</td></tr>
+            </table>
+
+            <h2>TTL Best Practices</h2>
+            <table>
+                <tr>
+                    <th>Use Case</th>
+                    <th>Recommended TTL</th>
+                    <th>Modifier</th>
+                </tr>
+                <tr><td>Critical malware (fast updates)</td><td>60–120 s</td><td><code>:ttl=60</code></td></tr>
+                <tr><td>Standard tracking / ads</td><td>300 s (5 min)</td><td><code>:ttl=300</code></td></tr>
+                <tr><td>Stable known advertisers</td><td>3600 s (1 h)</td><td><code>:ttl=3600</code></td></tr>
+                <tr><td>Permanent / very stable lists</td><td>86400 s (24 h)</td><td><code>:ttl=86400</code></td></tr>
+            </table>
+        </section>
+
+        <section id="troubleshooting">
+            <h1>🐛 Troubleshooting</h1>
+            
+            <h2>Common Issues</h2>
+            
+            <h3>1. Configuration Not Loading</h3>
+            <pre><code class="language-bash"># Check config file locations
+ubs-tool config-show
+
+# Generate new config
+ubs-tool config-init
+
+# Specify config explicitly
+ubs-tool --config my-config.yaml validate rules.ubs</code></pre>
+
+            <h3>2. Low ML Prediction Accuracy</h3>
+            <div class="highlight-box">
+                <h4>Solution</h4>
+                <p>Retrain with more diverse data. Ensure your training data covers all categories well.</p>
+                <pre><code class="language-bash"># Check training data distribution
+ubs-tool stats rules.ubs
+
+# Add more examples
+ubs-tool merge rules.ubs additional-examples.ubs --output better-training.ubs</code></pre>
+            </div>
+
+            <h3>3. Slow Performance</h3>
+            <pre><code class="language-bash"># Enable performance features
+ubs-tool config-edit performance.use_bloom_filter true
+ubs-tool config-edit performance.use_trie true
+
+# Optimize rules
+ubs-tool optimize rules.ubs --output optimized.ubs --aggressive
+
+# Run benchmark
+ubs-tool benchmark rules.ubs</code></pre>
+
+            <h3>4. False Positives</h3>
+            <pre><code class="language-bash"># Detect false positives
+ubs-tool check-false-positives rules.ubs
+
+# Simulate traffic to test
+ubs-tool simulate rules.ubs --requests 10000
+
+# Test specific URLs
+ubs-tool test rules.ubs --url https://suspected-false-positive.com</code></pre>
+        </section>
+
+        <section id="installation">
+            <h1>📥 Installation & Quick Start</h1>
+            
+            <h2>Requirements</h2>
+            <ul>
+                <li>Python 3.7+</li>
+                <li>No external dependencies (Pure Python!)</li>
+                <li>Optional: PyYAML for better YAML support</li>
+            </ul>
+
+            <h2>5-Minute Quick Start</h2>
+            <ol>
+                <li><strong>Download all 10 modules</strong></li>
+                <li><strong>Initialize configuration:</strong>
+                    <div class="command-example">ubs-tool config-init</div>
+                </li>
+                <li><strong>Create your first UBS file</strong></li>
+                <li><strong>Validate:</strong>
+                    <div class="command-example">ubs-tool validate rules.ubs</div>
+                </li>
+                <li><strong>Convert:</strong>
+                    <div class="command-example">ubs-tool convert-all rules.ubs --output ./output/</div>
+                </li>
+            </ol>
+
+            <h2>Production Deployment Checklist</h2>
+            <div class="feature-list">
+                <div class="feature-item">Load production profile</div>
+                <div class="feature-item">Merge all rule sources</div>
+                <div class="feature-item">Optimize rules</div>
+                <div class="feature-item">Check for false positives</div>
+                <div class="feature-item">Run ML analysis</div>
+                <div class="feature-item">Generate all export formats</div>
+                <div class="feature-item">Setup auto-update service</div>
+                <div class="feature-item">Configure webhooks</div>
+                <div class="feature-item">Start API server</div>
+                <div class="feature-item">Setup daily ML reports</div>
+            </div>
+        </section>
+
+        <section id="syntax">
+            <h1>📝 UBS Syntax Reference</h1>
+            
+            <h2>Basic Domain Blocking</h2>
+            <pre><code># Simple domain
+example.com
+
+# Wildcard (all subdomains)
+*.ads.example.com
+
+# Regex pattern
+~^ad[sx]?\d+\..*$</code></pre>
+
+            <h2>With Modifiers</h2>
+            <pre><code># Block with logging
+tracker.com :block :log
+
+# Block only third-party
+||analytics.com^ :third-party
+
+# High severity with category
+malware.com :severity=critical :category=malware</code></pre>
+
+            <h2>Complete Example</h2>
+            <pre><code>! Title: Complete Security Blocklist
+! Version: 2.1.0
+! Updated: 2025-10-10
+! License: MIT
+! Target: dns,browser,waf
+
+[Malware-Domains]
+evil-malware.com :severity=critical :category=malware
+dangerous-site.net :severity=high :category=malware
+
+[Tracking]
+||analytics.google.com^ :third-party :category=tracker
+||facebook.com/tr/* :script :category=tracker
+
+[Whitelist]
+@@||paypal.com^ :reason="Payment processor"
+@||cdn.cloudflare.com^ :first-party</code></pre>
+        </section>
+
+        <section id="best-practices">
+            <h1>🎓 Best Practices</h1>
+            
+            <h2>ML Model Training</h2>
+            <ol>
+                <li><strong>Use diverse training data</strong> - Include various categories</li>
+                <li><strong>Regular retraining</strong> - Retrain as you add new rules</li>
+                <li><strong>Validate predictions</strong> - Manually review high-confidence predictions</li>
+                <li><strong>Tune thresholds</strong> - Adjust based on your needs</li>
+                <li><strong>Combine with traditional rules</strong> - Use ML as augmentation</li>
+            </ol>
+
+            <h2>Confidence Thresholds</h2>
+            <table>
+                <tr>
+                    <th>Range</th>
+                    <th>Confidence</th>
+                    <th>Action</th>
+                </tr>
+                <tr style="background: #e8f5e9;">
+                    <td>≥ 0.9</td>
+                    <td>Very High</td>
+                    <td>Auto-block recommended</td>
+                </tr>
+                <tr style="background: #fff3e0;">
+                    <td>0.7-0.9</td>
+                    <td>High</td>
+                    <td>Review and likely block</td>
+                </tr>
+                <tr style="background: #fff9c4;">
+                    <td>0.5-0.7</td>
+                    <td>Medium</td>
+                    <td>Manual review required</td>
+                </tr>
+                <tr style="background: #ffebee;">
+                    <td>&lt; 0.5</td>
+                    <td>Low</td>
+                    <td>Investigate before action</td>
+                </tr>
+            </table>
+
+            <h2>Performance Optimization</h2>
+            <ul>
+                <li>Run <code>optimize</code> before deployment</li>
+                <li>Use DNS checks periodically, not always</li>
+                <li>Enable Bloom filter and Trie for large lists</li>
+                <li>Prefer simple domains over regex when possible</li>
+                <li>Use wildcards efficiently</li>
+            </ul>
+
+            <h2>Testing Workflow</h2>
+            <ol>
+                <li>Validate syntax: <code>ubs-tool validate rules.ubs</code></li>
+                <li>Check false positives: <code>ubs-tool check-false-positives rules.ubs</code></li>
+                <li>Test URLs: <code>ubs-tool test rules.ubs --batch critical-urls.txt</code></li>
+                <li>Simulate traffic: <code>ubs-tool simulate rules.ubs --requests 50000</code></li>
+                <li>Run benchmarks: <code>ubs-tool benchmark rules.ubs</code></li>
+            </ol>
+        </section>
+
+        <section id="whats-new">
+            <h1>🎉 What's New in v3.0</h1>
+            
+            <h2>Major Features</h2>
+            <div class="module-grid">
+                <div class="module-card" style="border-left-color: #48bb78;">
+                    <h3>🤖 Machine Learning Module</h3>
+                    <ul>
+                        <li>Auto-categorization</li>
+                        <li>Pattern recognition</li>
+                        <li>Rule suggestions</li>
+                        <li>Anomaly detection</li>
+                        <li>Risk scoring (0-100)</li>
+                        <li>Threat levels</li>
+                    </ul>
+                </div>
+
+                <div class="module-card" style="border-left-color: #667eea;">
+                    <h3>📊 Enhanced Analytics</h3>
+                    <ul>
+                        <li>ML accuracy metrics</li>
+                        <li>Threat intelligence reports</li>
+                        <li>Risk scoring dashboards</li>
+                        <li>Pattern analysis</li>
+                    </ul>
+                </div>
+
+                <div class="module-card" style="border-left-color: #f39c12;">
+                    <h3>🔧 New CLI Commands</h3>
+                    <ul>
+                        <li>ml-categorize</li>
+                        <li>ml-suggest</li>
+                        <li>ml-detect-anomalies</li>
+                        <li>ml-analyze</li>
+                    </ul>
+                </div>
+
+                <div class="module-card" style="border-left-color: #38b2ac;">
+                    <h3>⏱️ TTL Extension</h3>
+                    <ul>
+                        <li>Per-rule TTL modifier</li>
+                        <li>TTL-aware Unbound / BIND</li>
+                        <li>dnsmasq / Pi-hole / CoreDNS</li>
+                        <li>TTL analysis report</li>
+                        <li>2-line migration path</li>
+                    </ul>
+                </div>
+            </div>
+
+            <h2>Improvements</h2>
+            <ul>
+                <li>🚀 120+ total features (was 110+)</li>
+                <li>🤖 4 new ML CLI commands</li>
+                <li>📊 Advanced threat intelligence capabilities</li>
+                <li>🎯 Risk scoring (0-100 scale)</li>
+                <li>🔍 DGA domain detection</li>
+                <li>📈 ML accuracy metrics and benchmarks</li>
+                <li>📚 Extensive ML documentation</li>
+                <li>💡 10+ ML use case examples</li>
+            </ul>
+
+            <h2>Performance</h2>
+            <table>
+                <tr>
+                    <th>Operation</th>
+                    <th>Speed</th>
+                </tr>
+                <tr>
+                    <td>Feature extraction</td>
+                    <td>&lt;1ms per domain</td>
+                </tr>
+                <tr>
+                    <td>ML categorization</td>
+                    <td>~2ms per domain</td>
+                </tr>
+                <tr>
+                    <td>Batch analysis (1000)</td>
+                    <td>~5-10 seconds</td>
+                </tr>
+            </table>
+        </section>
+
+        <footer>
+            <h2>🛡️ Universal Blocklist Syntax</h2>
+            <p><strong>Version 3.0</strong> - Intelligent Content Filtering for the Modern Web</p>
+            <p>
+                <span class="badge badge-feature">120+ Features</span>
+                <span class="badge badge-ml">Machine Learning</span>
+                <span class="badge badge-new">Zero Dependencies</span>
+            </p>
+            <p style="margin-top: 20px;">
+                <strong>Complete Solution:</strong> 11 Modules • 21 Export Formats • 30+ CLI Commands • REST API • Pure Python
+            </p>
+            <p style="margin-top: 20px; opacity: 0.8;">
+                Documentation v3.1 | Updated: 2026-03-27 | MIT License
+            </p>
+            <p style="margin-top: 15px;">
+                <strong>🎉 Happy Blocking!</strong>
+            </p>
+        </footer>
+    </div>
+
+    <script>
+        // Smooth scrolling for anchor links
+        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+            anchor.addEventListener('click', function (e) {
+                e.preventDefault();
+                const target = document.querySelector(this.getAttribute('href'));
+                if (target) {
+                    target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }
+            });
+        });
+
+        // Print button functionality
+        function printDoc() {
+            window.print();
+        }
+
+        // Add print button if needed
+        if (window.location.search.includes('print')) {
+            const printBtn = document.createElement('button');
+            printBtn.textContent = '🖨️ Print Documentation';
+            printBtn.style.cssText = 'position: fixed; top: 20px; right: 20px; padding: 10px 20px; background: #667eea; color: white; border: none; border-radius: 5px; cursor: pointer; z-index: 1000;';
+            printBtn.onclick = printDoc;
+            document.body.appendChild(printBtn);
+        }
+    </script>
+</body>
+</html>

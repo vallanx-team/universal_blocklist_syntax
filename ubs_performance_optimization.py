@@ -297,11 +297,10 @@ class OptimizedRuleMatcher:
         """Fast domain matching"""
         matches = []
         
-        # Quick bloom filter check (eliminates most non-matches)
+        # Quick bloom filter check — fast negative path (no false negatives)
         if not self.bloom.contains(domain):
-            # Definitely not in the list (might still have false positives)
-            pass
-        
+            return []
+
         # Check trie for exact and wildcard matches
         trie_matches = self.trie.search_wildcard(domain)
         matches.extend(trie_matches)

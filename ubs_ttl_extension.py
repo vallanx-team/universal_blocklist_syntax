@@ -34,25 +34,10 @@ except ImportError:
     sys.exit(1)
 
 
-
-# BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-# if BASE_DIR not in sys.path:
-#     sys.path.insert(0, BASE_DIR)
-
-# try:
-#     from ubs_parser import UBSConverter, UBSParser, RuleType, Rule
-# except ImportError:
-#     print("Error: ubs_parser.py not found. Please ensure it's in the same directory.")
-#     exit(1)
-
 class UBSConverter:
+    """Minimal base class — provides parser access for UBSConverterTTL."""
     def __init__(self, parser: UBSParser):
         self.parser = parser
-
-    def convert(self):
-        # Basis-Logik
-        return getattr(self.parser, 'rules', [])
-
 
 
 class UBSConverterTTL(UBSConverter):
@@ -446,42 +431,16 @@ class UBSConverterTTL(UBSConverter):
     # ========================================================================
     
     def to_unbound(self) -> str:
-        """
-        Enhanced version of original to_unbound() with optional TTL support.
-        Falls back to original behavior if no TTL modifiers present.
-        """
-        # Check if any rules have TTL modifiers
-        has_ttl = any(rule.modifiers.get('ttl') for rule in self.parser.rules)
-        
-        if has_ttl:
-            return self.to_unbound_ttl()
-        else:
-            return super().to_unbound()
-    
+        """TTL-aware Unbound output (uses default TTL when :ttl= not set)."""
+        return self.to_unbound_ttl()
+
     def to_bind(self) -> str:
-        """
-        Enhanced version of original to_bind() with optional TTL support.
-        Falls back to original behavior if no TTL modifiers present.
-        """
-        has_ttl = any(rule.modifiers.get('ttl') for rule in self.parser.rules 
-                     if rule.rule_type == RuleType.DOMAIN)
-        
-        if has_ttl:
-            return self.to_bind_ttl()
-        else:
-            return super().to_bind()
-    
+        """TTL-aware BIND output (uses default TTL when :ttl= not set)."""
+        return self.to_bind_ttl()
+
     def to_dnsmasq(self) -> str:
-        """
-        Enhanced version of original to_dnsmasq() with optional TTL support.
-        Falls back to original behavior if no TTL modifiers present.
-        """
-        has_ttl = any(rule.modifiers.get('ttl') for rule in self.parser.rules)
-        
-        if has_ttl:
-            return self.to_dnsmasq_ttl()
-        else:
-            return super().to_dnsmasq()
+        """TTL-aware dnsmasq output (omits TTL suffix when :ttl= not set)."""
+        return self.to_dnsmasq_ttl()
 
 
 # ============================================================================

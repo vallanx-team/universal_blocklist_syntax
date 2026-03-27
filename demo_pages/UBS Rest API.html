@@ -1,0 +1,512 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>UBS REST API Documentation v3.0</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            line-height: 1.6;
+            color: #2d3748;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            overflow: hidden;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 50px 40px;
+            text-align: center;
+        }
+        
+        .header h1 {
+            font-size: 2.8em;
+            margin-bottom: 15px;
+            font-weight: 700;
+        }
+        
+        .header .version {
+            font-size: 1.2em;
+            opacity: 0.95;
+            font-weight: 300;
+        }
+        
+        .header .base-url {
+            margin-top: 20px;
+            padding: 15px;
+            background: rgba(255,255,255,0.15);
+            border-radius: 8px;
+            font-family: 'Monaco', 'Courier New', monospace;
+            font-size: 0.95em;
+        }
+        
+        .content {
+            padding: 40px;
+        }
+        
+        .intro {
+            background: linear-gradient(135deg, #f7fafc 0%, #edf2f7 100%);
+            padding: 25px;
+            border-radius: 10px;
+            margin-bottom: 35px;
+            border-left: 5px solid #667eea;
+        }
+        
+        .intro h2 {
+            color: #667eea;
+            margin-bottom: 12px;
+            font-size: 1.5em;
+        }
+        
+        .intro p {
+            color: #4a5568;
+            margin-bottom: 8px;
+        }
+        
+        .endpoint {
+            background: white;
+            border: 2px solid #e2e8f0;
+            border-radius: 12px;
+            margin-bottom: 25px;
+            overflow: hidden;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        
+        .endpoint:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 12px 24px rgba(102, 126, 234, 0.15);
+            border-color: #667eea;
+        }
+        
+        .endpoint-header {
+            padding: 25px;
+            background: linear-gradient(135deg, #f7fafc 0%, #edf2f7 100%);
+            border-bottom: 2px solid #e2e8f0;
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+        
+        .method {
+            font-weight: 700;
+            padding: 8px 16px;
+            border-radius: 6px;
+            font-size: 0.85em;
+            min-width: 70px;
+            text-align: center;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        .method.get {
+            background: linear-gradient(135deg, #48bb78 0%, #38a169 100%);
+            color: white;
+        }
+        
+        .method.post {
+            background: linear-gradient(135deg, #4299e1 0%, #3182ce 100%);
+            color: white;
+        }
+        
+        .path {
+            font-family: 'Monaco', 'Courier New', monospace;
+            font-size: 1.2em;
+            color: #2d3748;
+            flex: 1;
+            font-weight: 600;
+        }
+        
+        .endpoint-body {
+            padding: 25px;
+        }
+        
+        .description {
+            color: #4a5568;
+            margin-bottom: 20px;
+            font-size: 1.05em;
+            line-height: 1.7;
+        }
+        
+        .section {
+            margin-top: 25px;
+        }
+        
+        .section h4 {
+            color: #667eea;
+            margin-bottom: 12px;
+            font-size: 1.1em;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .param-item {
+            background: #f7fafc;
+            padding: 12px 16px;
+            border-radius: 6px;
+            margin-bottom: 10px;
+            font-family: 'Monaco', 'Courier New', monospace;
+            font-size: 0.9em;
+            border-left: 3px solid #667eea;
+        }
+        
+        .code-block {
+            background: #2d3748;
+            color: #e2e8f0;
+            padding: 20px;
+            border-radius: 8px;
+            overflow-x: auto;
+            margin-top: 12px;
+            box-shadow: inset 0 2px 4px rgba(0,0,0,0.2);
+        }
+        
+        .code-block code {
+            font-family: 'Monaco', 'Courier New', monospace;
+            font-size: 0.9em;
+            line-height: 1.6;
+        }
+        
+        .formats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+            gap: 10px;
+            margin-top: 12px;
+        }
+        
+        .format-badge {
+            background: #edf2f7;
+            padding: 8px 12px;
+            border-radius: 6px;
+            text-align: center;
+            font-size: 0.85em;
+            font-weight: 600;
+            color: #4a5568;
+            border: 1px solid #cbd5e0;
+        }
+        
+        .footer {
+            background: linear-gradient(135deg, #f7fafc 0%, #edf2f7 100%);
+            padding: 30px;
+            text-align: center;
+            color: #4a5568;
+            border-top: 2px solid #e2e8f0;
+        }
+        
+        .footer a {
+            color: #667eea;
+            text-decoration: none;
+            font-weight: 600;
+        }
+        
+        .footer a:hover {
+            text-decoration: underline;
+        }
+        
+        .badge {
+            display: inline-block;
+            padding: 4px 10px;
+            background: #667eea;
+            color: white;
+            border-radius: 12px;
+            font-size: 0.75em;
+            font-weight: 600;
+            margin-left: 10px;
+            text-transform: uppercase;
+        }
+        
+        .json-response {
+            background: #2d3748;
+            color: #a0aec0;
+            padding: 18px;
+            border-radius: 8px;
+            font-family: 'Monaco', 'Courier New', monospace;
+            font-size: 0.85em;
+            line-height: 1.7;
+            overflow-x: auto;
+        }
+        
+        .json-key { color: #63b3ed; }
+        .json-string { color: #68d391; }
+        .json-number { color: #f6ad55; }
+        .json-boolean { color: #fc8181; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🛡️ UBS REST API</h1>
+            <div class="version">Version 3.0 | Universal Blocklist Syntax</div>
+            <div class="base-url">
+                <strong>Base URL:</strong> {{ base_url }}
+            </div>
+        </div>
+        
+        <div class="content">
+            <div class="intro">
+                <h2>📚 API Übersicht</h2>
+                <p>Diese REST API ermöglicht das Parsen, Konvertieren, Validieren und Analysieren von UBS (Universal Blocklist Syntax) Dateien.</p>
+                <p><strong>Features:</strong> Machine Learning Analyse, 21+ Exportformate, Echtzeit-Validierung, Statistiken & Analytics</p>
+                <p><strong>Authentifizierung:</strong> HTTP Basic Auth (Username/Password erforderlich)</p>
+            </div>
+            
+            <!-- Parse Endpoint -->
+            <div class="endpoint">
+                <div class="endpoint-header">
+                    <span class="method post">POST</span>
+                    <span class="path">/api/parse</span>
+                    <span class="badge">Required First</span>
+                </div>
+                <div class="endpoint-body">
+                    <p class="description">Parse und validiere eine UBS-Datei. Dies ist der erste Schritt - die Datei wird im Server-Speicher geladen und steht für weitere Operationen zur Verfügung.</p>
+                    
+                    <div class="section">
+                        <h4>📤 Request Body</h4>
+                        <div class="param-item">Content-Type: multipart/form-data<br>Field: "file" (UBS file)</div>
+                    </div>
+                    
+                    <div class="section">
+                        <h4>💻 cURL Beispiel</h4>
+                        <div class="code-block">
+                            <code>curl -X POST {{ base_url }}/api/parse \
+  -u username:password \
+  -F "file=@blocklist.ubs"</code>
+                        </div>
+                    </div>
+                    
+                    <div class="section">
+                        <h4>📥 Response</h4>
+                        <div class="json-response">
+<span class="json-key">{
+  "success"</span>: <span class="json-boolean">true</span>,
+  <span class="json-key">"rules_count"</span>: <span class="json-number">1234</span>,
+  <span class="json-key">"metadata"</span>: {
+    <span class="json-key">"title"</span>: <span class="json-string">"My Blocklist"</span>,
+    <span class="json-key">"version"</span>: <span class="json-string">"1.0"</span>
+  },
+  <span class="json-key">"errors"</span>: []
+}</div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Convert Endpoint -->
+            <div class="endpoint">
+                <div class="endpoint-header">
+                    <span class="method get">GET</span>
+                    <span class="path">/api/convert</span>
+                </div>
+                <div class="endpoint-body">
+                    <p class="description">Konvertiere die aktuell geladene UBS-Datei in ein beliebiges Zielformat. Die Datei wird als Download zurückgegeben.</p>
+                    
+                    <div class="section">
+                        <h4>🔧 Query Parameters</h4>
+                        <div class="param-item">format=<strong>FORMAT_NAME</strong> (siehe verfügbare Formate unten)</div>
+                    </div>
+                    
+                    <div class="section">
+                        <h4>💻 cURL Beispiel</h4>
+                        <div class="code-block">
+                            <code>curl -X GET "{{ base_url }}/api/convert?format=hosts" \
+  -u username:password \
+  -o blocklist.txt</code>
+                        </div>
+                    </div>
+                    
+                    <div class="section">
+                        <h4>📋 Verfügbare Formate (21+)</h4>
+                        <div class="formats-grid">
+                            <div class="format-badge">hosts</div>
+                            <div class="format-badge">adblock</div>
+                            <div class="format-badge">dnsmasq</div>
+                            <div class="format-badge">unbound</div>
+                            <div class="format-badge">bind</div>
+                            <div class="format-badge">pihole</div>
+                            <div class="format-badge">proxypac</div>
+                            <div class="format-badge">squid</div>
+                            <div class="format-badge">littlesnitch</div>
+                            <div class="format-badge">pgl</div>
+                            <div class="format-badge">suricata</div>
+                            <div class="format-badge">opnsense</div>
+                            <div class="format-badge">pfsense</div>
+                            <div class="format-badge">mikrotik</div>
+                            <div class="format-badge">cisco</div>
+                            <div class="format-badge">juniper</div>
+                            <div class="format-badge">ipset</div>
+                            <div class="format-badge">nftables</div>
+                            <div class="format-badge">iptables</div>
+                            <div class="format-badge">nginx</div>
+                            <div class="format-badge">cloudflare</div>
+                        </div>
+                    </div>
+                    
+                    <div class="section">
+                        <h4>📥 Response</h4>
+                        <div class="param-item">Content-Type: text/plain (Datei-Download)<br>Content-Disposition: attachment; filename="blocklist.FORMAT"</div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Validate Endpoint -->
+            <div class="endpoint">
+                <div class="endpoint-header">
+                    <span class="method get">GET</span>
+                    <span class="path">/api/validate</span>
+                </div>
+                <div class="endpoint-body">
+                    <p class="description">Führe eine umfassende Validierung der aktuell geladenen UBS-Datei durch. Prüft Syntax, Semantik und optionale DNS-Checks.</p>
+                    
+                    <div class="section">
+                        <h4>💻 cURL Beispiel</h4>
+                        <div class="code-block">
+                            <code>curl -X GET {{ base_url }}/api/validate \
+  -u username:password</code>
+                        </div>
+                    </div>
+                    
+                    <div class="section">
+                        <h4>📥 Response</h4>
+                        <div class="json-response">
+<span class="json-key">{
+  "valid"</span>: <span class="json-boolean">true</span>,
+  <span class="json-key">"issues"</span>: [
+    {
+      <span class="json-key">"severity"</span>: <span class="json-string">"warning"</span>,
+      <span class="json-key">"line"</span>: <span class="json-number">42</span>,
+      <span class="json-key">"message"</span>: <span class="json-string">"Duplicate rule detected"</span>,
+      <span class="json-key">"suggestion"</span>: <span class="json-string">"Remove duplicate entry"</span>
+    }
+  ],
+  <span class="json-key">"stats"</span>: {
+    <span class="json-key">"errors"</span>: <span class="json-number">0</span>,
+    <span class="json-key">"warnings"</span>: <span class="json-number">1</span>,
+    <span class="json-key">"info"</span>: <span class="json-number">3</span>
+  }
+}</div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- ML Analyze Endpoint -->
+            <div class="endpoint">
+                <div class="endpoint-header">
+                    <span class="method post">POST</span>
+                    <span class="path">/api/ml-analyze</span>
+                    <span class="badge">ML Powered</span>
+                </div>
+                <div class="endpoint-body">
+                    <p class="description">Machine Learning Analyse von Domains zur Erkennung von Malware, Phishing und verdächtigen Mustern. Verwendet trainierte ML-Modelle für Threat Intelligence.</p>
+                    
+                    <div class="section">
+                        <h4>📤 Request Body</h4>
+                        <div class="code-block">
+                            <code>{
+  <span class="json-key">"domains"</span>: [
+    <span class="json-string">"example.com"</span>,
+    <span class="json-string">"suspicious-site.xyz"</span>,
+    <span class="json-string">"malware-domain.net"</span>
+  ]
+}</code>
+                        </div>
+                    </div>
+                    
+                    <div class="section">
+                        <h4>💻 cURL Beispiel</h4>
+                        <div class="code-block">
+                            <code>curl -X POST {{ base_url }}/api/ml-analyze \
+  -u username:password \
+  -H "Content-Type: application/json" \
+  -d '{"domains": ["example.com", "test.xyz"]}'</code>
+                        </div>
+                    </div>
+                    
+                    <div class="section">
+                        <h4>📥 Response</h4>
+                        <div class="json-response">
+<span class="json-key">{
+  "success"</span>: <span class="json-boolean">true</span>,
+  <span class="json-key">"count"</span>: <span class="json-number">2</span>,
+  <span class="json-key">"analyses"</span>: [
+    {
+      <span class="json-key">"domain"</span>: <span class="json-string">"example.com"</span>,
+      <span class="json-key">"risk_score"</span>: <span class="json-number">15.3</span>,
+      <span class="json-key">"threat_level"</span>: <span class="json-string">"LOW"</span>,
+      <span class="json-key">"category"</span>: <span class="json-string">"legitimate"</span>,
+      <span class="json-key">"confidence"</span>: <span class="json-number">0.95</span>,
+      <span class="json-key">"recommendation"</span>: <span class="json-string">"ALLOW"</span>
+    }
+  ]
+}</div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Stats Endpoint -->
+            <div class="endpoint">
+                <div class="endpoint-header">
+                    <span class="method get">GET</span>
+                    <span class="path">/api/stats</span>
+                </div>
+                <div class="endpoint-body">
+                    <p class="description">Detaillierte Statistiken über die aktuell geladene UBS-Datei. Zeigt Verteilung nach Regeltypen, Kategorien und Schweregrad.</p>
+                    
+                    <div class="section">
+                        <h4>💻 cURL Beispiel</h4>
+                        <div class="code-block">
+                            <code>curl -X GET {{ base_url }}/api/stats \
+  -u username:password</code>
+                        </div>
+                    </div>
+                    
+                    <div class="section">
+                        <h4>📥 Response</h4>
+                        <div class="json-response">
+<span class="json-key">{
+  "total_rules"</span>: <span class="json-number">1234</span>,
+  <span class="json-key">"by_type"</span>: {
+    <span class="json-key">"domain"</span>: <span class="json-number">1000</span>,
+    <span class="json-key">"url"</span>: <span class="json-number">200</span>,
+    <span class="json-key">"regex"</span>: <span class="json-number">34</span>
+  },
+  <span class="json-key">"by_severity"</span>: {
+    <span class="json-key">"critical"</span>: <span class="json-number">45</span>,
+    <span class="json-key">"high"</span>: <span class="json-number">234</span>,
+    <span class="json-key">"medium"</span>: <span class="json-number">567</span>
+  },
+  <span class="json-key">"unique_domains"</span>: <span class="json-number">1150</span>,
+  <span class="json-key">"wildcard_count"</span>: <span class="json-number">89</span>
+}</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="footer">
+            <p style="font-size: 1.2em; margin-bottom: 10px;"><strong>📖 Universal Blocklist Syntax (UBS) API Documentation</strong></p>
+            <p style="margin-bottom: 15px;">Version 3.0 | MIT License</p>
+            <p>
+                <a href="/">← Zurück zur Hauptseite</a> | 
+                <a href="/api/docs/json">JSON Format ansehen</a>
+            </p>
+            <p style="margin-top: 15px; opacity: 0.7;">© 2025 Valanx UBS Team</p>
+        </div>
+    </div>
+</body>
+</html>

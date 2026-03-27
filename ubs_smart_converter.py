@@ -246,17 +246,17 @@ class SmartConverter:
             # Apply optimizations
             optimizations = []
             if optimize:
-                original_parser = self.parser
+                original_rules = list(self.parser.rules)
                 optimized_rules, optimizations = self.optimizer.optimize_for_format(target_format)
                 # Temporarily replace rules
                 self.parser.rules = optimized_rules
-            
+
             # Convert based on format
             content = self._do_conversion(target_format)
-            
+
             # Restore original rules
             if optimize:
-                self.parser.rules = original_parser.rules
+                self.parser.rules = original_rules
             
             return ConversionResult(
                 format=target_format.value,

@@ -24,14 +24,14 @@ from datetime import datetime
 from io import BytesIO, StringIO
 from functools import wraps
 from flask import Response
+from markupsafe import escape as html_escape
 
-# Flask is available on alwaysdata by default
+# Flask is required — install via: pip install flask
 try:
     from flask import Flask, request, jsonify, render_template_string, send_file, redirect, url_for
 except ImportError:
-    print("Flask not found. Installing...")
-    os.system(f"{sys.executable} -m pip install flask")
-    from flask import Flask, request, jsonify, render_template_string, send_file, redirect, url_for
+    print("Flask not found. Please install it: pip install flask", file=sys.stderr)
+    sys.exit(1)
 
 # Import UBS modules (ensure they're in the same directory or PYTHONPATH)
 import_errors = []
@@ -862,10 +862,10 @@ def validate_page():
         
         for issue in issues[:50]:
             html += f"""
-                <div class="issue {issue.severity}">
-                    <strong>[{issue.severity.upper()}] Line {issue.line_number}</strong><br>
-                    {issue.message}<br>
-                    {f'<em>💡 {issue.suggestion}</em>' if issue.suggestion else ''}
+                <div class="issue {html_escape(issue.severity)}">
+                    <strong>[{html_escape(issue.severity.upper())}] Line {issue.line_number}</strong><br>
+                    {html_escape(issue.message)}<br>
+                    {f'<em>💡 {html_escape(issue.suggestion)}</em>' if issue.suggestion else ''}
                 </div>
             """
         
@@ -937,7 +937,7 @@ def analytics_page():
     """
     
     for rule_type, count in sorted(stats.by_type.items(), key=lambda x: -x[1]):
-        html += f"<tr><td>{rule_type}</td><td>{count}</td></tr>"
+        html += f"<tr><td>{html_escape(str(rule_type))}</td><td>{count}</td></tr>"
     
     html += """
             </table>
@@ -970,7 +970,8 @@ def server_error(e):
 application = app
 
 if __name__ == '__main__':
-    # For local testing
+    # For local testing only — never run with debug=True in production
+    debug_mode = os.getenv("FLASK_DEBUG", "0") == "1"
     print("🚀 Starting UBS Web Application...")
     print("📍 Open http://localhost:5000 in your browser")
-    app.run(debug=True, host='0.0.0.0', port=5000)
+    app.run(debug=debug_mode, host='127.0.0.1', port=5000)
