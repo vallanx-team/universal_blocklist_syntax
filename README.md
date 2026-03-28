@@ -4,6 +4,14 @@ A unified, extensible syntax for creating blocklists compatible with multiple fi
 
 ---
 
+## Quick Links
+
+1. [Tutorial](https://github.com/vallanx-team/universal_blocklist_syntax/blob/main/docs/01%20Universal%20Blocklist%20Syntax%20-%20Tutorial.md)
+2. [Documentation](https://github.com/vallanx-team/universal_blocklist_syntax/blob/main/docs/02%20UBS%20-%20Complete%20Documentation.md)
+3. [Complete References](https://github.com/vallanx-team/universal_blocklist_syntax/blob/main/docs/03%20UBS%20-%20Complete%20Reference.md)
+
+---
+
 ## Features
 
 - **21+ export formats** — hosts, AdBlock/uBlock, dnsmasq, Unbound, BIND, Pi-hole, Squid, Suricata, iptables, nftables, ModSecurity, nginx, Apache, Cloudflare WAF, AWS WAF, and more
